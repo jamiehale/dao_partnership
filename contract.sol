@@ -6,8 +6,11 @@ contract Partnership
 	event ConfirmationRequired(bytes32 _operation, address _initiator, address _to, uint _value, bytes _data);
 	event TransactionSent(bytes32 _transaction, address _finalSigner, address _to, uint _value, bytes _data);
 	
+	/// Array of partner addresses
+	address [] partners;
+	
 	/// Collection of partner addresses (1 => 'partner', 0/unset => 'not partner')
-	mapping(address => uint) public partners;
+	mapping(address => uint) public partnerRecords;
 	
 	/// Count of partners
 	uint public partnerCount;
@@ -46,8 +49,9 @@ contract Partnership
 	}
 	
 	function Partnership(address[] _partners) {
+		partners = _partners;
 		for (uint i = 0; i < _partners.length; i++) {
-			partners[_partners[i]] = 1;
+			partnerRecords[_partners[i]] = 1;
 		}
 		partnerCount = _partners.length;
 	}
@@ -58,7 +62,7 @@ contract Partnership
 	}
 	
 	function isPartner(address _address) returns (bool) {
-		return partners[_address] == 1;
+		return partnerRecords[_address] == 1;
 	}
 	
 	/// Adds a proposed transaction to be confirmed by other partners
@@ -100,6 +104,14 @@ contract Partnership
 	
 	function kill(address _to) onlyAllPartners(sha3(msg.data)) external {
 		suicide(_to);
+	}
+	
+	function dissolve() onlyAllPartners(sha3(msg.data)) external {
+		uint payout = this.balance / partnerCount;
+		for ( uint i = 0; i < partnerCount; i++ ) {
+			partners[i].send(payout);
+		}
+		suicide(partners[0]);
 	}
 	
 	function confirmOperation(bytes32 _operation) internal {
