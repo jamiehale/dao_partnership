@@ -2,6 +2,7 @@
 /// Requires all pre-defined partners agreement on transactions and operations.
 contract Partnership
 {
+	event Funded();
 	event Deposit(address _from, uint _value);
 	event ConfirmationRequired(bytes32 _operation, address _initiator, address _to, uint _value, bytes _data);
 	event TransactionSent(bytes32 _transaction, address _finalSigner, address _to, uint _value, bytes _data);
@@ -26,50 +27,59 @@ contract Partnership
 	
 	/// Collection of pending transactions (ie send X ETH to Y with Z data)
 	mapping(bytes32 => Transaction) public transactions;
-	
-	/// Collection of pending operations (ie internal function calls)
-	mapping(bytes32 => Operation) public operations;
-	
+
 	struct Partner {
+		/// Flag indicating that this record has been initialized
 		bool isPartner;
 		/// Flag indicating that the partner has paid for their share
 		bool paid;
 		/// Total amount loaned to the partnership by the partner
 		uint loanBalance;
+		/// Amount released for withdrawal by the partner
+		uint withdrawableAmount;
 	}
 
 	struct Transaction {
+		/// Flag indicating that this record has been initialized
+		bool valid;
+		/// Proposed recipient for the transaction (0 indicates a new contract will be created)
 		address to;
+		/// Proposed amount to send (0 indicates no wei)
 		uint value;
+		/// Optional array of data to send with the transaction
 		bytes data;
+		/// Optional description of proposed transaction
+		string description;
+		/// Account that created the transaction
+		address creator;
 		/// Total number of partners that have confirmed/voted
 		uint voteCount;
 		/// Collection of partners that have confirmed/voted
 		mapping(address => uint) votes;
+		/// Flag indicating that all partners have confirmed
+		bool passed;
+		/// Flag indicatint that the transaction has been sent
+		bool sent;
 	}
 	
-	struct Operation {
-		uint voteCount;
-		mapping(address => uint) votes;
-	}
-
 	modifier onlyFunded {
-		if (funded)
+		if (!funded)
+	       		throw;
 		_
 	}
 
 	modifier onlyPartner {
-		if (isPartner(msg.sender))
+		if (!isPartner(msg.sender))
+			throw;
 		_
 	}
 
-	/// Allows the call iff all partners have made the same call
-	modifier onlyAllPartners(bytes32 _operation) {
-		confirmOperation(_operation);
-		if (operations[_operation].voteCount == partnerCount)
+	modifier onlyDao {
+		if (msg.sender != address(this))
+			throw;
 		_
 	}
-	
+
 	function Partnership(address[] _partners, uint _sharePrice) {
 		funded = false;
 		sharePrice = _sharePrice;
@@ -83,12 +93,12 @@ contract Partnership
 	function() {
 		if (msg.value > 0) {
 			if (funded) {
-				if (partnerRecords[msg.sender].isPartner) {
+				if (isPartner(msg.sender)) {
 					partnerRecords[msg.sender].loanBalance += msg.value;
 				}
 			}
 			else {
-				if (partnerRecords[msg.sender].isPartner) {
+				if (isPartner(msg.sender)) {
 					if (partnerRecords[msg.sender].paid) {
 						throw;
 					}
@@ -98,6 +108,7 @@ contract Partnership
 							paidPartnerCount += 1;
 							if (paidPartnerCount == partnerCount) {
 								funded = true;
+								Funded();
 							}
 						}
 						else {
@@ -113,63 +124,154 @@ contract Partnership
 		}
 	}
 	
-	function isPartner(address _address) returns (bool) {
-		return partnerRecords[_address].isPartner;
-	}
-	
 	/// Adds a proposed transaction to be confirmed by other partners
-	function proposeTransaction(address _to, uint _value, bytes _data) onlyFunded onlyPartner external returns (bytes32) {
-		bytes32 hash = sha3(msg.data, block.number);
+	function proposeTransaction(address _to, uint _value, bytes _data, string _description) onlyFunded onlyPartner external returns (bytes32) {
+
+		// generate hash for easy specification in confirm and execute
+		bytes32 id = sha3(msg.data, block.number);
 		
-		var transaction = transactions[hash];
-		
+		// grab the presumably blank transaction
+		var transaction = transactions[id];
+
+		transaction.valid = true;
 		transaction.to = _to;
 		transaction.value = _value;
 		transaction.data = _data;
+		transaction.description = _description;
+		transaction.creator = msg.sender;
 		transaction.voteCount = 1;
 		transaction.votes[msg.sender] = 1;
+		transaction.passed = false;
+		transaction.sent = false;
 		
-		ConfirmationRequired(hash, msg.sender, _to, _value, _data);
+		ConfirmationRequired(id, msg.sender, _description);
 		
-		return hash;
+		return id;
 	}
 	
-	/// Confirms an existing proposed transaction and executes it if all partners have confirmed
+	/// Confirms an existing proposed transaction
 	function confirmTransaction(bytes32 _id) onlyFunded onlyPartner external {
+
 		var transaction = transactions[_id];
-		
-		if (transaction.to == 0)
+	
+		// ensure this is a transaction we've set up	
+		if (!transaction.valid)
 			throw;
-		
+	
+		// ignore second confirmation
 		if (transaction.votes[msg.sender] == 1)
 			throw;
-		
+	
+		// register the vote	
 		transaction.voteCount += 1;
 		transaction.votes[msg.sender] = 1;
 		
 		if (transaction.voteCount == partnerCount) {
+			transaction.passed = true;
+			TransactionPassed(_id, msg.sender, transaction.to, transaction.value, transaction.data);
+		}
+	}
+
+	/// Executes a passed transaction
+	function executeTransaction(bytes32 _id) onlyFunded onlyPartner external {
+
+		var transaction = transactions[_id];
+
+		// ignore transactions that have not passed yet
+		if (!transaction.passed)
+			throw;
+
+		// ignore transactions that have already been sent
+		if (transaction.sent)
+			throw;
+
+		// register the sent transaction
+		transaction.sent = true;
+
+		// send the transaction
+		if (transactions[_id].to.call.value(transactions[_id].value)(transactions[_id].data)) {
+
 			TransactionSent(_id, msg.sender, transaction.to, transaction.value, transaction.data);
-			transactions[_id].to.call.value(transactions[_id].value)(transactions[_id].data);
+
+			// clear the transaction structure to free memory
 			delete transactions[_id];
 		}
-	}
-	
-	function dissolve() onlyFunded onlyAllPartners(sha3(msg.data)) external {
-		uint payout = this.balance / partnerCount;
-		for ( uint i = 0; i < partnerCount; i++ ) {
-			partners[i].send(payout);
+		else {
+			// roll back if the call failed
+			transaction.sent = false;
 		}
-		suicide(partners[0]);
+	}
+
+	/// Distribute ETH to a partner
+	function distribute(address _partner, uint _amount) onlyDao external {
+
+		// ignore invalid partners
+		if (!isPartner(_partner))
+			throw;
+
+		partnerRecords[_partner].withdrawableAmount += _amount;
+	}
+
+	/// Distribute ETH evenly amongst all partners
+	function distributeEvenly(uint _amount) onlyDao external {
+
+		var payout = _amount / partnerCount;
+
+		for (uint i = 0; i < partnerCount; i++) {
+			partnerRecords[partners[i]].withdrawableAmount += payout;
+	}
+
+	/// Mark down partner's loan and make it available for withdrawal
+	function repayLoan(address _partner, uint _amount) onlyDao external {
+
+		// ignore invalid partners
+		if (!partnerRecords[_partner].isPartner)
+			throw;
+
+		// ignore invalid amounts
+		if (_amount > partnerRecords[_partner].loanBalance)
+			throw;
+
+		partnerRecords[_partner].loanBalance -= amount;
+		partnerRecords[_partner].withdrawableAmount += amount;
+	}
+
+	/// Allow partner to withdraw funds marked as withdrawable
+	function withdraw(uint _amount) onlyFunded onlyPartner external {
+
+		// ignore requests for more than the amount allowed
+		if (_amount > partnerRecords[msg.sender].withdrawableAmount)
+			throw;
+
+		// ignore requests for more than the available balance
+		if (_amount > this.balance)
+			throw;
+
+		// mark the withdrawal as successful
+		partnerRecords[msg.sender].withdrawableAmount -= _amount;
+
+		// send the wei
+		if (msg.sender.send(_amount)) {
+			Withdrawal(msg.sender, _amount);
+		}
+		else {
+			// roll back if the send failed
+			partnerRecords[msg.sender].withdrawableAmount += _amount;
+		}
 	}
 	
-	function confirmOperation(bytes32 _operation) internal {
-		if (!isPartner(msg.sender))
+	/// Dissolve DAO and send the remaining ETH to a beneficiary
+	function dissolve(address _beneficiary) onlyDao external {
+
+		// ignore unset beneficiary
+		if (_beneficiary == 0)
 			throw;
-		
-		if (operations[_operation].votes[msg.sender] == 1)
-			throw;
-		
-		operations[_operation].voteCount += 1;
-		operations[_operation].votes[msg.sender] = 1;
+
+		suicide(_beneficiary);
 	}
+	
+	function isPartner(address _address) internal returns (bool) {
+		return partnerRecords[_address].isPartner;
+	}
+	
 }
