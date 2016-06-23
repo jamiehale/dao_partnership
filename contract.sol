@@ -264,8 +264,8 @@ contract Partnership
 	/// Dissolve DAO and send the remaining ETH to a beneficiary
 	function dissolve(address _beneficiary) onlyDao external {
 
-		// ignore unset beneficiary
-		if (_beneficiary == 0)
+		// ignore unset beneficiary, or recursive dissolution?
+		if ((_beneficiary == 0) || (_beneficiary == this))
 			throw;
 
 		suicide(_beneficiary);
