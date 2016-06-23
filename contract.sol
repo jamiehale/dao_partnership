@@ -4,8 +4,10 @@ contract Partnership
 {
 	event Funded();
 	event Deposit(address _from, uint _value);
-	event ConfirmationRequired(bytes32 _operation, address _initiator, address _to, uint _value, bytes _data);
-	event TransactionSent(bytes32 _transaction, address _finalSigner, address _to, uint _value, bytes _data);
+	event TransactionProposed(bytes32 _id, address _initiator, string _description);
+	event TransactionPassed(bytes32 _id, address _finalSigner, string _description);
+	event TransactionSent(bytes32 _transaction, address _executor, string _description);
+	event Withdrawal(address _partner, uint _amount);
 
 	/// Price in wei of each equal share of the partnership
 	uint public sharePrice;
@@ -82,8 +84,8 @@ contract Partnership
 
 	function Partnership(address[] _partners, uint _sharePrice) {
 		funded = false;
-		sharePrice = _sharePrice;
 		partners = _partners;
+		sharePrice = _sharePrice;
 		for (uint i = 0; i < _partners.length; i++) {
 			partnerRecords[_partners[i]].isPartner = true;
 		}
@@ -145,7 +147,7 @@ contract Partnership
 		transaction.passed = false;
 		transaction.sent = false;
 		
-		ConfirmationRequired(id, msg.sender, _description);
+		TransactionProposed(id, msg.sender, _description);
 		
 		return id;
 	}
@@ -169,7 +171,7 @@ contract Partnership
 		
 		if (transaction.voteCount == partnerCount) {
 			transaction.passed = true;
-			TransactionPassed(_id, msg.sender, transaction.to, transaction.value, transaction.data);
+			TransactionPassed(_id, msg.sender, transaction.description);
 		}
 	}
 
@@ -192,7 +194,7 @@ contract Partnership
 		// send the transaction
 		if (transactions[_id].to.call.value(transactions[_id].value)(transactions[_id].data)) {
 
-			TransactionSent(_id, msg.sender, transaction.to, transaction.value, transaction.data);
+			TransactionSent(_id, msg.sender, transaction.description);
 
 			// clear the transaction structure to free memory
 			delete transactions[_id];
@@ -220,6 +222,7 @@ contract Partnership
 
 		for (uint i = 0; i < partnerCount; i++) {
 			partnerRecords[partners[i]].withdrawableAmount += payout;
+		}
 	}
 
 	/// Mark down partner's loan and make it available for withdrawal
@@ -233,8 +236,8 @@ contract Partnership
 		if (_amount > partnerRecords[_partner].loanBalance)
 			throw;
 
-		partnerRecords[_partner].loanBalance -= amount;
-		partnerRecords[_partner].withdrawableAmount += amount;
+		partnerRecords[_partner].loanBalance -= _amount;
+		partnerRecords[_partner].withdrawableAmount += _amount;
 	}
 
 	/// Allow partner to withdraw funds marked as withdrawable
@@ -268,6 +271,10 @@ contract Partnership
 		if (_beneficiary == 0)
 			throw;
 
+		// prevent lost balance
+		if (_beneficiary == address(this))
+		    throw;
+
 		suicide(_beneficiary);
 	}
 	
@@ -276,3 +283,4 @@ contract Partnership
 	}
 	
 }
+
