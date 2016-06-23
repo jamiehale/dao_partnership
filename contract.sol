@@ -89,7 +89,8 @@ contract Partnership
 		}
 		partnerCount = _partners.length;
 	}
-	
+
+	/// This executes when funds are sent to the contract
 	function() {
 		if (msg.value > 0) {
 			if (funded) {
