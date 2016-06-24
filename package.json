@@ -1,0 +1,11 @@
+{
+  "name": "dao_partnership",
+  "version": "0.1.0",
+  "description": "partnership DAO",
+  "devDependencies": {
+    "solc": ">0.1.6"
+  },
+  "scripts": {
+    "test": "node test.js"
+  }
+}
