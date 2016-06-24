@@ -90,6 +90,7 @@ contract Partnership
 			partnerRecords[_partners[i]].isPartner = true;
 		}
 		partnerCount = _partners.length;
+		paidPartnerCount = 0;
 	}
 
 	/// This executes when funds are sent to the contract
@@ -108,7 +109,7 @@ contract Partnership
 					else {
 						if (msg.value == sharePrice) {
 							partnerRecords[msg.sender].paid = true;
-							paidPartnerCount += 1;
+							paidPartnerCount = paidPartnerCount + 1;
 							if (paidPartnerCount == partnerCount) {
 								funded = true;
 								Funded();
