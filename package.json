@@ -1,0 +1,10 @@
+'devDependencies': {
+  'solc': '>0.1.6'
+}
+'scripts': {
+  'test': 'var solc = require('solc');
+           const fs = require('fs');
+           code = fs.readFileSync('contract.sol','utf8');
+           var output = solc.compile(code, 1);
+           output;'
+}
