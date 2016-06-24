@@ -6,6 +6,6 @@
     "solc": ">0.1.6"
   },
   "scripts": {
-    "test": "nodejs test.js"
+    "test": "node test.js"
   }
 }
