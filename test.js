@@ -5,9 +5,8 @@ var output = solc.compile(code, 1);
 if (output.errors) {
   console.log(output.errors);
   console.log("Build failed.")
-  return 1;
+  process.exit(1);
 } else {
   console.log(output);
   console.log("Build succeeded.")
-  return 0;
 }
