@@ -1,3 +1,5 @@
+deliberate-syntax-error-for-test - 3828, x
+rrr
 /// Partnership
 /// Requires all pre-defined partners agreement on transactions and operations.
 contract Partnership
