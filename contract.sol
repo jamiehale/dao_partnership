@@ -1,4 +1,3 @@
-DELIBERATE_ERROR
 /// Partnership
 /// Requires all pre-defined partners agreement on transactions and operations.
 contract Partnership
