@@ -34,6 +34,9 @@ contract Partnership
 	/// Count of transactions awaiting confirmation, execution, or cancelation
 	uint public activeTransactionCount;
 
+	/// Available withdrawals
+	mapping(address => uint) public withdrawableAmounts;
+
 	struct Partner {
 		/// Flag indicating that this record has been initialized
 		bool isPartner;
@@ -41,8 +44,6 @@ contract Partnership
 		bool paid;
 		/// Total amount loaned to the partnership by the partner
 		uint loanBalance;
-		/// Amount released for withdrawal by the partner
-		uint withdrawableAmount;
 	}
 
 	struct Transaction {
@@ -241,14 +242,10 @@ contract Partnership
 		}
 	}
 
-	/// Distribute ETH to a partner
-	function distribute(address _partner, uint _amount) onlyDao external {
+	/// Distribute ETH to a partner or external recipient
+	function distribute(address _recipient, uint _amount) onlyDao external {
 
-		// ignore invalid partners
-		if (!isPartner(_partner))
-			throw;
-
-		partnerRecords[_partner].withdrawableAmount += _amount;
+		withdrawableAmounts[_recipient] += _amount;
 	}
 
 	/// Distribute ETH evenly amongst all partners
@@ -257,7 +254,7 @@ contract Partnership
 		var payout = _amount / partnerCount;
 
 		for (uint i = 0; i < partnerCount; i++) {
-			partnerRecords[partners[i]].withdrawableAmount += payout;
+			withdrawableAmounts[partners[i]] += payout;
 		}
 	}
 
@@ -273,14 +270,14 @@ contract Partnership
 			throw;
 
 		partnerRecords[_partner].loanBalance -= _amount;
-		partnerRecords[_partner].withdrawableAmount += _amount;
+		withdrawableAmounts[_partner] += _amount;
 	}
 
-	/// Allow partner to withdraw funds marked as withdrawable
-	function withdraw(uint _amount) onlyFunded onlyPartner external {
+	/// Allow partner or external recipient to withdraw funds marked as withdrawable
+	function withdraw(uint _amount) onlyFunded external {
 
 		// ignore requests for more than the amount allowed
-		if (_amount > partnerRecords[msg.sender].withdrawableAmount)
+		if (_amount > withdrawableAmounts[msg.sender])
 			throw;
 
 		// ignore requests for more than the available balance
@@ -288,7 +285,7 @@ contract Partnership
 			throw;
 
 		// mark the withdrawal as successful
-		partnerRecords[msg.sender].withdrawableAmount -= _amount;
+		withdrawableAmounts[msg.sender] -= _amount;
 
 		// send the wei
 		if (msg.sender.send(_amount)) {
@@ -296,7 +293,7 @@ contract Partnership
 		}
 		else {
 			// roll back if the send failed
-			partnerRecords[msg.sender].withdrawableAmount += _amount;
+			withdrawableAmounts[msg.sender] += _amount;
 		}
 	}
 	
