@@ -31,6 +31,9 @@ contract Partnership
 	/// Collection of pending transactions (ie send X ETH to Y with Z data)
 	mapping(bytes32 => Transaction) public transactions;
 
+	/// Count of transactions awaiting confirmation, execution, or cancelation
+	uint public activeTransactionCount;
+
 	struct Partner {
 		/// Flag indicating that this record has been initialized
 		bool isPartner;
@@ -148,6 +151,8 @@ contract Partnership
 		transaction.votes[msg.sender] = 1;
 		transaction.passed = false;
 		transaction.sent = false;
+
+		activeTransactionCount += 1;
 		
 		TransactionProposed(id, msg.sender, _description);
 		
@@ -172,6 +177,8 @@ contract Partnership
 			throw;
 
 		delete transactions[_id];
+
+		activeTransactionCount -= 1;
 
 		TransactionCanceled(_id, msg.sender);
 	}
@@ -216,6 +223,8 @@ contract Partnership
 		// register the sent transaction
 		transaction.sent = true;
 
+		activeTransactionCount -= 1;
+
 		// send the transaction
 		if (transactions[_id].to.call.value(transactions[_id].value)(transactions[_id].data)) {
 
@@ -227,6 +236,8 @@ contract Partnership
 		else {
 			// roll back if the call failed
 			transaction.sent = false;
+
+			activeTransactionCount += 1;
 		}
 	}
 
