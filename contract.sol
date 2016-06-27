@@ -69,21 +69,92 @@ contract Partnership
 		bool sent;
 	}
 	
-	modifier onlyFunded {
+	modifier onlyWhenFunded {
 		if (!funded)
 	       		throw;
 		_
 	}
 
-	modifier onlyPartner {
+	modifier onlyByPartner {
 		if (!isPartner(msg.sender))
 			throw;
 		_
 	}
 
-	modifier onlyDao {
+	modifier onlyByDao {
 		if (msg.sender != address(this))
 			throw;
+		_
+	}
+
+	modifier onlyValidTransaction(bytes32 _id) {
+		if (!transactions[_id].valid)
+			throw;
+		_
+	}
+
+	modifier onlyPassedTransaction(bytes32 _id) {
+		if (!transactions[_id].passed)
+			throw;
+		_
+	}
+
+	modifier onlyUnpassedTransaction(bytes32 _id) {
+		if (transactions[_id].passed)
+			throw;
+		_
+	}
+
+	modifier onlyTransactionCreator(bytes32 _id) {
+		if (transactions[_id].creator != msg.sender)
+			throw;
+		_
+	}
+
+	modifier onlyUnconfirmedBySender(bytes32 _id) {
+		if (transactions[_id].votes[msg.sender] == 1)
+			throw;
+		_
+	}
+
+	modifier onlyUnsentTransaction(bytes32 _id) {
+		if (transactions[_id].sent)
+			throw;
+		_
+	}
+
+	modifier mustBePartner(address _recipient) {
+		if (!isPartner(_recipient))
+			throw;
+		_
+	}
+
+	modifier noMoreThanLoan(address _recipient, uint _amount) {
+		if (_amount > partnerRecords[_recipient].loanBalance)
+			throw;
+		_
+	}
+
+	modifier cannotExceedWithdrawableAmount(uint _amount) {
+		if (_amount > withdrawableAmounts[msg.sender])
+			throw;
+		_
+	}
+
+	modifier cannotExceedContractBalance(uint _amount) {
+		if (_amount > this.balance)
+			throw;
+		_
+	}
+
+	modifier onlyValidBeneficiary(address _beneficiary) {
+		// ignore unset beneficiary
+		if (_beneficiary == 0)
+			throw;
+
+		// prevent lost balance
+		if (_beneficiary == address(this))
+		    throw;
 		_
 	}
 
@@ -134,7 +205,7 @@ contract Partnership
 	}
 	
 	/// Adds a proposed transaction to be confirmed by other partners
-	function proposeTransaction(address _to, uint _value, bytes _data, string _description) onlyFunded onlyPartner external returns (bytes32) {
+	function proposeTransaction(address _to, uint _value, bytes _data, string _description) onlyWhenFunded onlyByPartner external returns (bytes32) {
 
 		// generate hash for easy specification in confirm and execute
 		bytes32 id = sha3(msg.data, block.number);
@@ -161,21 +232,7 @@ contract Partnership
 	}
 
 	/// Cancels a transaction that has not yet passed
-	function cancelTransaction(bytes32 _id) onlyFunded onlyPartner external {
-
-		var transaction = transactions[_id];
-
-		// ensure this is a transaction we've set up
-		if (!transaction.valid)
-			throw;
-
-		// ensure this transaction hasn't passed
-		if (transaction.passed)
-			throw;
-
-		// only the creator can cancel
-		if (transaction.creator != msg.sender)
-			throw;
+	function cancelTransaction(bytes32 _id) onlyWhenFunded onlyByPartner onlyValidTransaction(_id) onlyUnpassedTransaction(_id) onlyTransactionCreator(_id) external {
 
 		delete transactions[_id];
 
@@ -186,17 +243,9 @@ contract Partnership
 
 	
 	/// Confirms an existing proposed transaction
-	function confirmTransaction(bytes32 _id) onlyFunded onlyPartner external {
+	function confirmTransaction(bytes32 _id) onlyWhenFunded onlyByPartner onlyValidTransaction(_id) onlyUnconfirmedBySender(_id) external {
 
 		var transaction = transactions[_id];
-	
-		// ensure this is a transaction we've set up	
-		if (!transaction.valid)
-			throw;
-	
-		// ignore second confirmation
-		if (transaction.votes[msg.sender] == 1)
-			throw;
 	
 		// register the vote	
 		transaction.voteCount += 1;
@@ -209,17 +258,9 @@ contract Partnership
 	}
 
 	/// Executes a passed transaction
-	function executeTransaction(bytes32 _id) onlyFunded onlyPartner external {
+	function executeTransaction(bytes32 _id) onlyWhenFunded onlyByPartner onlyPassedTransaction(_id) onlyUnsentTransaction(_id) external {
 
 		var transaction = transactions[_id];
-
-		// ignore transactions that have not passed yet
-		if (!transaction.passed)
-			throw;
-
-		// ignore transactions that have already been sent
-		if (transaction.sent)
-			throw;
 
 		// register the sent transaction
 		transaction.sent = true;
@@ -227,7 +268,7 @@ contract Partnership
 		activeTransactionCount -= 1;
 
 		// send the transaction
-		if (transactions[_id].to.call.value(transactions[_id].value)(transactions[_id].data)) {
+		if (transaction.to.call.value(transaction.value)(transaction.data)) {
 
 			TransactionSent(_id, msg.sender, transaction.description);
 
@@ -243,15 +284,15 @@ contract Partnership
 	}
 
 	/// Distribute ETH to a partner or external recipient
-	function distribute(address _recipient, uint _amount) onlyDao external {
+	function distribute(address _recipient, uint _amount) onlyByDao external {
 
 		withdrawableAmounts[_recipient] += _amount;
 	}
 
 	/// Distribute ETH evenly amongst all partners
-	function distributeEvenly(uint _amount) onlyDao external {
+	function distributeEvenly(uint _amount) onlyByDao external {
 
-		var payout = _amount / partnerCount;
+		uint payout = _amount / partnerCount;
 
 		for (uint i = 0; i < partnerCount; i++) {
 			withdrawableAmounts[partners[i]] += payout;
@@ -259,30 +300,14 @@ contract Partnership
 	}
 
 	/// Mark down partner's loan and make it available for withdrawal
-	function repayLoan(address _partner, uint _amount) onlyDao external {
+	function repayLoan(address _recipient, uint _amount) onlyByDao mustBePartner(_recipient) noMoreThanLoan(_recipient, _amount) external {
 
-		// ignore invalid partners
-		if (!partnerRecords[_partner].isPartner)
-			throw;
-
-		// ignore invalid amounts
-		if (_amount > partnerRecords[_partner].loanBalance)
-			throw;
-
-		partnerRecords[_partner].loanBalance -= _amount;
-		withdrawableAmounts[_partner] += _amount;
+		partnerRecords[_recipient].loanBalance -= _amount;
+		withdrawableAmounts[_recipient] += _amount;
 	}
 
 	/// Allow partner or external recipient to withdraw funds marked as withdrawable
-	function withdraw(uint _amount) onlyFunded external {
-
-		// ignore requests for more than the amount allowed
-		if (_amount > withdrawableAmounts[msg.sender])
-			throw;
-
-		// ignore requests for more than the available balance
-		if (_amount > this.balance)
-			throw;
+	function withdraw(uint _amount) onlyWhenFunded cannotExceedWithdrawableAmount(_amount) cannotExceedContractBalance(_amount) external {
 
 		// mark the withdrawal as successful
 		withdrawableAmounts[msg.sender] -= _amount;
@@ -298,15 +323,7 @@ contract Partnership
 	}
 	
 	/// Dissolve DAO and send the remaining ETH to a beneficiary
-	function dissolve(address _beneficiary) onlyDao external {
-
-		// ignore unset beneficiary
-		if (_beneficiary == 0)
-			throw;
-
-		// prevent lost balance
-		if (_beneficiary == address(this))
-		    throw;
+	function dissolve(address _beneficiary) onlyByDao onlyValidBeneficiary(_beneficiary) external {
 
 		suicide(_beneficiary);
 	}
