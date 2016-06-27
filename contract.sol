@@ -5,6 +5,7 @@ contract Partnership
 	event Funded();
 	event Deposit(address _from, uint _value);
 	event TransactionProposed(bytes32 _id, address _initiator, string _description);
+	event TransactionCanceled(bytes32 _id, address _actor);
 	event TransactionPassed(bytes32 _id, address _finalSigner, string _description);
 	event TransactionSent(bytes32 _transaction, address _executor, string _description);
 	event Withdrawal(address _partner, uint _amount);
@@ -152,6 +153,29 @@ contract Partnership
 		
 		return id;
 	}
+
+	/// Cancels a transaction that has not yet passed
+	function cancelTransaction(bytes32 _id) onlyFunded onlyPartner external {
+
+		var transaction = transactions[_id];
+
+		// ensure this is a transaction we've set up
+		if (!transaction.valid)
+			throw;
+
+		// ensure this transaction hasn't passed
+		if (transaction.passed)
+			throw;
+
+		// only the creator can cancel
+		if (transaction.creator != msg.sender)
+			throw;
+
+		delete transactions[_id];
+
+		TransactionCanceled(_id, msg.sender);
+	}
+
 	
 	/// Confirms an existing proposed transaction
 	function confirmTransaction(bytes32 _id) onlyFunded onlyPartner external {
