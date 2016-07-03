@@ -1,6 +1,7 @@
 {
   "name": "dao_partnership",
   "version": "0.1.0",
+  "private": true,
   "description": "partnership DAO",
   "devDependencies": {
     "solc": ">0.1.6"
