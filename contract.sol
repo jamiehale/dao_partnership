@@ -1,5 +1,6 @@
 /// Partnership
 /// Requires all pre-defined partners agreement on transactions and operations.
+pragma solidity ^0.4.4;
 contract Partnership
 {
 	event Funded();
@@ -72,79 +73,79 @@ contract Partnership
 	modifier onlyWhenFunded {
 		if (!funded)
 	       		throw;
-		_
+		_;
 	}
 
 	modifier onlyByPartner {
 		if (!isPartner(msg.sender))
 			throw;
-		_
+		_;
 	}
 
 	modifier onlyByDao {
 		if (msg.sender != address(this))
 			throw;
-		_
+		_;
 	}
 
 	modifier onlyValidTransaction(bytes32 _id) {
 		if (!transactions[_id].valid)
 			throw;
-		_
+		_;
 	}
 
 	modifier onlyPassedTransaction(bytes32 _id) {
 		if (!transactions[_id].passed)
 			throw;
-		_
+		_;
 	}
 
 	modifier onlyUnpassedTransaction(bytes32 _id) {
 		if (transactions[_id].passed)
 			throw;
-		_
+		_;
 	}
 
 	modifier onlyTransactionCreator(bytes32 _id) {
 		if (transactions[_id].creator != msg.sender)
 			throw;
-		_
+		_;
 	}
 
 	modifier onlyUnconfirmedBySender(bytes32 _id) {
 		if (transactions[_id].votes[msg.sender] == 1)
 			throw;
-		_
+		_;
 	}
 
 	modifier onlyUnsentTransaction(bytes32 _id) {
 		if (transactions[_id].sent)
 			throw;
-		_
+		_;
 	}
 
 	modifier mustBePartner(address _recipient) {
 		if (!isPartner(_recipient))
 			throw;
-		_
+		_;
 	}
 
 	modifier noMoreThanLoan(address _recipient, uint _amount) {
 		if (_amount > partnerRecords[_recipient].loanBalance)
 			throw;
-		_
+		_;
 	}
 
 	modifier cannotExceedWithdrawableAmount(uint _amount) {
 		if (_amount > withdrawableAmounts[msg.sender])
 			throw;
-		_
+		_;
 	}
 
 	modifier cannotExceedContractBalance(uint _amount) {
 		if (_amount > this.balance)
 			throw;
-		_
+		_;
 	}
 
 	modifier onlyValidBeneficiary(address _beneficiary) {
@@ -155,7 +156,7 @@ contract Partnership
 		// prevent lost balance
 		if (_beneficiary == address(this))
 		    throw;
-		_
+		_;
 	}
 
 	function Partnership(address[] _partners, uint _sharePrice) {
@@ -170,7 +171,7 @@ contract Partnership
 	}
 
 	/// This executes when funds are sent to the contract
-	function() {
+	function() payable {
 		if (msg.value > 0) {
 			if (funded) {
 				if (isPartner(msg.sender)) {

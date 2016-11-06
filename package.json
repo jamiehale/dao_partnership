@@ -4,7 +4,7 @@
   "private": true,
   "description": "partnership DAO",
   "devDependencies": {
-    "solc": ">0.1.6"
+    "solc": "^0.4.4"
   },
   "license" : "MIT",
   "scripts": {
