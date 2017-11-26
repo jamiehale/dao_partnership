@@ -156,7 +156,7 @@ contract Partnership
 	}
 
 	/// This executes when funds are sent to the contract
-	function() payable private {
+	function() public payable {
 		if (msg.value > 0) {
 			if (funded) {
 				if (isPartner(msg.sender)) {
