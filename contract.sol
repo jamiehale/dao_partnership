@@ -1,6 +1,6 @@
 /// Partnership
 /// Requires all pre-defined partners agreement on transactions and operations.
-pragma solidity ^0.4.4;
+pragma solidity ^0.4.18;
 contract Partnership
 {
 	event Funded();
@@ -71,95 +71,80 @@ contract Partnership
 	}
 	
 	modifier onlyWhenFunded {
-		if (!funded)
-	       		throw;
+		require (funded);
 		_;
 	}
 
 	modifier onlyByPartner {
-		if (!isPartner(msg.sender))
-			throw;
+		require (isPartner(msg.sender));
 		_;
 	}
 
 	modifier onlyByDao {
-		if (msg.sender != address(this))
-			throw;
+		require (msg.sender == address(this));
 		_;
 	}
 
 	modifier onlyValidTransaction(bytes32 _id) {
-		if (!transactions[_id].valid)
-			throw;
+		require (transactions[_id].valid);
 		_;
 	}
 
 	modifier onlyPassedTransaction(bytes32 _id) {
-		if (!transactions[_id].passed)
-			throw;
+		require (transactions[_id].passed);
 		_;
 	}
 
 	modifier onlyUnpassedTransaction(bytes32 _id) {
-		if (transactions[_id].passed)
-			throw;
+		require (!transactions[_id].passed);
 		_;
 	}
 
 	modifier onlyTransactionCreator(bytes32 _id) {
-		if (transactions[_id].creator != msg.sender)
-			throw;
+		require (transactions[_id].creator == msg.sender);
 		_;
 	}
 
 	modifier onlyUnconfirmedBySender(bytes32 _id) {
-		if (transactions[_id].votes[msg.sender] == 1)
-			throw;
+		require (transactions[_id].votes[msg.sender] != 1);
 		_;
 	}
 
 	modifier onlyUnsentTransaction(bytes32 _id) {
-		if (transactions[_id].sent)
-			throw;
+		require (!transactions[_id].sent);
 		_;
 	}
 
 	modifier mustBePartner(address _recipient) {
-		if (!isPartner(_recipient))
-			throw;
+		require (isPartner(_recipient));
 		_;
 	}
 
 	modifier noMoreThanLoan(address _recipient, uint _amount) {
-		if (_amount > partnerRecords[_recipient].loanBalance)
-			throw;
+		require (_amount <= partnerRecords[_recipient].loanBalance);
 		_;
 	}
 
 	modifier cannotExceedWithdrawableAmount(uint _amount) {
-		if (_amount > withdrawableAmounts[msg.sender])
-			throw;
+		require (_amount <= withdrawableAmounts[msg.sender]);
 		_;
 	}
 
 	modifier cannotExceedContractBalance(uint _amount) {
-		if (_amount > this.balance)
-			throw;
+		require (_amount <= this.balance);
 		_;
 	}
 
 	modifier onlyValidBeneficiary(address _beneficiary) {
 		// ignore unset beneficiary
-		if (_beneficiary == 0)
-			throw;
+		require (_beneficiary != 0);
 
 		// prevent lost balance
-		if (_beneficiary == address(this))
-		    throw;
+		require (_beneficiary != address(this));
 		_;
 	}
 
-	function Partnership(address[] _partners, uint _sharePrice) {
+	function Partnership(address[] _partners, uint _sharePrice) public {
 		funded = false;
 		partners = _partners;
 		sharePrice = _sharePrice;
@@ -171,7 +156,7 @@ contract Partnership
 	}
 
 	/// This executes when funds are sent to the contract
-	function() payable {
+	function() public payable {
 		if (msg.value > 0) {
 			if (funded) {
 				if (isPartner(msg.sender)) {
@@ -179,26 +164,14 @@ contract Partnership
 				}
 			}
 			else {
-				if (isPartner(msg.sender)) {
-					if (partnerRecords[msg.sender].paid) {
-						throw;
-					}
-					else {
-						if (msg.value == sharePrice) {
-							partnerRecords[msg.sender].paid = true;
-							paidPartnerCount = paidPartnerCount + 1;
-							if (paidPartnerCount == partnerCount) {
-								funded = true;
-								Funded();
-							}
-						}
-						else {
-							throw;
-						}
-					}
-				}
-				else {
-					throw;
+				require (isPartner(msg.sender));
+				require (!partnerRecords[msg.sender].paid);
+				require (msg.value == sharePrice);
+				partnerRecords[msg.sender].paid = true;
+				paidPartnerCount = paidPartnerCount + 1;
+				if (paidPartnerCount == partnerCount) {
+					funded = true;
+					Funded();
 				}
 			}
 			Deposit(msg.sender, msg.value);
@@ -209,7 +182,7 @@ contract Partnership
 	function proposeTransaction(address _to, uint _value, bytes _data, string _description) onlyWhenFunded onlyByPartner external returns (bytes32) {
 
 		// generate hash for easy specification in confirm and execute
-		bytes32 id = sha3(msg.data, block.number);
+		bytes32 id = keccak256(msg.data, block.number);
 		
 		// grab the presumably blank transaction
 		var transaction = transactions[id];
@@ -326,10 +299,10 @@ contract Partnership
 	/// Dissolve DAO and send the remaining ETH to a beneficiary
 	function dissolve(address _beneficiary) onlyByDao onlyValidBeneficiary(_beneficiary) external {
 
-		suicide(_beneficiary);
+		selfdestruct(_beneficiary);
 	}
 	
-	function isPartner(address _address) internal returns (bool) {
+	function isPartner(address _address) view internal returns (bool) {
 		return partnerRecords[_address].isPartner;
 	}
 	
