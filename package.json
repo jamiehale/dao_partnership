@@ -11,5 +11,8 @@
   "scripts": {
     "build": "./node_modules/.bin/truffle compile",
     "test": "./node_modules/.bin/truffle test"
+  },
+  "dependencies": {
+    "babel-register": "^6.26.0"
   }
 }
