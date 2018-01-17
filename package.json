@@ -1,13 +1,15 @@
 {
   "name": "dao_partnership",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "partnership DAO",
   "devDependencies": {
-    "solc": "^0.4.4"
+    "solium": "^1.0.9",
+    "truffle": "^4.0.4"
   },
-  "license" : "MIT",
+  "license": "MIT",
   "scripts": {
-    "test": "node test.js"
+    "build": "./node_modules/.bin/truffle compile",
+    "test": "./node_modules/.bin/truffle test"
   }
 }

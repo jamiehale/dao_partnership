@@ -6,7 +6,7 @@ A DAO for a simple partnership, written in Solidity for deployment on Ethereum.
 
 # Building
 
-    $ node test.js
+    $ npm run test
 
 # Continuous Integration
 
