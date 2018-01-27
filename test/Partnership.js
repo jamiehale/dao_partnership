@@ -71,11 +71,17 @@ contract('Partnership', function(accounts) {
     await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
     // parter1 sends loan
     await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: loan});
+    // nobody can withdraw 
+    await expectThrow(partnership.withdraw(loan,{from:partner1}));
+    await expectThrow(partnership.withdraw(loan,{from:partner2}));
+    await expectThrow(partnership.withdraw(loan,{from:attacker1}));
     // partner2 creates proposal to pay back loan
     var callData = partnership.contract.repayLoan.getData(partner1, loan);
     var txn1 = await partnership.proposeTransaction(partnership.address, 0, callData, "repay loan", {from:partner2});
     assert(txn1.logs[0].event === 'TransactionProposed');
     var txnId1 = txn1.logs[0].args._id;
+    // partner1 can't withdraw yet.
+    await expectThrow(partnership.withdraw(loan,{from:partner1}));
     // partner1 approves payback proposal
     var confirmation = await partnership.confirmTransaction(txnId1,{from:partner1});
     assert(confirmation.logs[0].event === 'TransactionPassed');
@@ -87,6 +93,8 @@ contract('Partnership', function(accounts) {
     // partner1 makes a withdrawal of the loan
     var withdrawal = await partnership.withdraw(loan, {from:partner1});
     assert(withdrawal.logs[0].event === 'Withdrawal');
+    // partner1 can't withdraw again.
+    await expectThrow(partnership.withdraw(loan,{from:partner1}));
   });
 
   // dissolving a fund is not a good idea because it abandons tokens.
