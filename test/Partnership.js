@@ -51,7 +51,10 @@ contract('Partnership', function(accounts) {
     assert(txn1.logs[0].event === 'TransactionProposed');
     var txnId1 = txn1.logs[0].args._id;
     await expectThrow(partnership.cancelTransaction(txnId1,{from:partner2}));
-    await partnership.confirmTransaction(txnId1,{from:partner2});
+    var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
+    assert(confirmation.logs[0].event === 'TransactionPassed');
+    var execution = await partnership.executeTransaction(txnId1,{from:partner1});
+    assert(execution.logs[0].event === 'TransactionSent');
 
     var txn2 = await partnership.proposeTransaction(customer2, amount, 0, "refund", {from:partner1});
     var txnId2 = txn2.logs[0].args._id;
