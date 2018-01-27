@@ -15,7 +15,7 @@ contract('Partnership', function(accounts) {
   let customer2 = accounts[7];
   let partnership;
   let amount = new web3.BigNumber(web3.toWei(0.005, "ether"));
-  let loan = new web3.BigNumber(web3.toWei(0.003, "ether"));
+  let loan = new web3.BigNumber(web3.toWei(0.103, "ether"));
 
   before(async function(){
 	});
@@ -101,12 +101,28 @@ contract('Partnership', function(accounts) {
   });
 
   // dissolving a fund is not a good idea because it abandons tokens.
-//  it('should allow partners to dissolve a fund', async function(){
+  it('should allow partners to dissolve a fund', async function(){
     // create fund
+    partnership = await Partnership.new([partner1, partner2], amount);
+    await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
+    await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
     // create proposal to dissolve
+    var callData = partnership.contract.dissolve.getData(customer1);
+    var txn1 = await partnership.proposeTransaction(partnership.address, 0, callData, "dissolve", {from:partner1});
+    assert(txn1.logs[0].event === 'TransactionProposed');
+    var txnId1 = txn1.logs[0].args._id;
     // approve dissolution proposal
-    // recipient should have the eth
-//  });
+    var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
+    assert(confirmation.logs[0].event === 'TransactionPassed');
+    var customerBalance = web3.eth.getBalance(customer1);
+    console.log(customerBalance);
+    // partner1 executes transaction
+    var execution = await partnership.executeTransaction(txnId1,{from:partner1});
+    assert(execution.logs[0].event === 'TransactionSent');
+    // recipient should have the eth ☺
+    assert.equal(web3.eth.getBalance(customer1) - customerBalance, amount * 2);
+    // but not the tokens ☹ 
+  });
 
 });
 /*
