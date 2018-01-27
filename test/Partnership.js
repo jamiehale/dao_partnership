@@ -100,6 +100,37 @@ contract('Partnership', function(accounts) {
     await expectThrow(partnership.withdraw(loan,{from:partner1}));
   });
 
+  // 
+  it('should distribute ETH evenly amongst all partners', async function(){
+    // TODO: what about rounding
+    // create fund
+    partnership = await Partnership.new([partner1, partner2], amount);
+    await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
+    await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
+    // create proposal to distribute evenly
+    var callData = partnership.contract.distributeEvenly.getData(amount * 2);
+    var txn1 = await partnership.proposeTransaction(partnership.address, 0, callData, "distribute evenly", {from:partner1});
+    assert(txn1.logs[0].event === 'TransactionProposed');
+    var txnId1 = txn1.logs[0].args._id;
+    // approve dissolution proposal
+    var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
+    assert(confirmation.logs[0].event === 'TransactionPassed');
+    // partner1 executes transaction
+    var execution = await partnership.executeTransaction(txnId1,{from:partner1});
+    assert(execution.logs[0].event === 'TransactionSent');
+    // randos can't make withdrawals
+    await expectThrow(partnership.withdraw(amount, {from:attacker1}));
+    // partners can't make excessive withdrawals
+    await expectThrow(partnership.withdraw(amount * 2, {from:partner1}));
+    // partners make withdrawals
+    var withdrawal = await partnership.withdraw(amount, {from:partner1});
+    assert(withdrawal.logs[0].event === 'Withdrawal');
+    var withdrawal = await partnership.withdraw(amount, {from:partner2});
+    assert(withdrawal.logs[0].event === 'Withdrawal');
+    // partners can't withdrawal again
+    await expectThrow(partnership.withdraw(amount, {from:partner1}));
+  });
+
   // dissolving a fund is not a good idea because it abandons tokens.
   it('should allow partners to dissolve a fund', async function(){
     // create fund
@@ -115,7 +146,6 @@ contract('Partnership', function(accounts) {
     var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
     assert(confirmation.logs[0].event === 'TransactionPassed');
     var customerBalance = web3.eth.getBalance(customer1);
-    console.log(customerBalance);
     // partner1 executes transaction
     var execution = await partnership.executeTransaction(txnId1,{from:partner1});
     assert(execution.logs[0].event === 'TransactionSent');
