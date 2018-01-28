@@ -34,7 +34,6 @@ contract('Partnership', function(accounts) {
     try {
       await web3.eth.sendTransaction({from:attacker1, to:partnership.address, value: amount});
     } catch (error) {
-      console.log(error.message);
       const revert = error.message.search('revert') >= 0;
       assert(revert);
     }
