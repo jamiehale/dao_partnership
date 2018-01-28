@@ -24,6 +24,7 @@ contract('Partnership', function(accounts) {
 
   // 
   it('should only allow partners to participate in the initial funding', async function(){
+    // create fund with three partners
     partnership = await Partnership.new([partner1, partner2, partner3], amount);
     await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
     await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
@@ -40,28 +41,38 @@ contract('Partnership', function(accounts) {
     // why does the above work but this does not?
     // expectThrow(web3.eth.sendTransaction({from:attacker1, to:partnership.address, value: amount}));
 
+    // partner 3 contributes to the fund, making it funded.
     await web3.eth.sendTransaction({from:partner3, to:partnership.address, value: amount});
-    // since funding is now complete, the customer should be able to send funds
+    // since funding is now complete, the customer should be able to send ether
     await web3.eth.sendTransaction({from:customer1, to:partnership.address, value: amount});
   });
 
   it('should allow only partners to propose transactions', async function(){
+    // create fund with two partners
     partnership = await Partnership.new([partner1, partner2], amount);
     await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
     await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
+    // create proposal to send ether
     var txn1 = await partnership.proposeTransaction(customer2, amount, 0, "refund", {from:partner1});
     assert(txn1.logs[0].event === 'TransactionProposed');
     var txnId1 = txn1.logs[0].args._id;
+    // partner who did not create the proposal should not be able to cancel it
     await expectThrow(partnership.cancelTransaction(txnId1,{from:partner2}));
+    // but should be able to confirm it
     var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
     assert(confirmation.logs[0].event === 'TransactionPassed');
+    // and the first partner should be able to confirm it
     var execution = await partnership.executeTransaction(txnId1,{from:partner1});
     assert(execution.logs[0].event === 'TransactionSent');
 
+    // test cancellation of a valid proposal
     var txn2 = await partnership.proposeTransaction(customer2, amount, 0, "refund", {from:partner1});
     var txnId2 = txn2.logs[0].args._id;
+    // partner who did not create the proposal should not be able to cancel it
     await expectThrow(partnership.cancelTransaction(txnId2,{from:partner2}));
+    // randos should not be able to cancel a proposal
     await expectThrow(partnership.cancelTransaction(txnId2,{from:attacker1}));
+    // initiator should be able to cancel a proposal
     var cancellation = await partnership.cancelTransaction(txnId2,{from:partner1});
     assert(cancellation.logs[0].event === 'TransactionCanceled');
 
