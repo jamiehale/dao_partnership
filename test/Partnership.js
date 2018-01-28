@@ -107,14 +107,18 @@ contract('Partnership', function(accounts) {
     partnership = await Partnership.new([partner1, partner2], amount);
     await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
     await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
+    // create proposal to distribute funds
     var callData = partnership.contract.distribute.getData(other1, distrib);
     var txn1 = await partnership.proposeTransaction(partnership.address, 0, callData, "distribute to rando", {from:partner1});
     assert(txn1.logs[0].event === 'TransactionProposed');
     var txnId1 = txn1.logs[0].args._id;
+    // approve distribution proposal
     var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
     assert(confirmation.logs[0].event === 'TransactionPassed');
+    // partner1 executes transaction
     var execution = await partnership.executeTransaction(txnId1,{from:partner1});
     assert(execution.logs[0].event === 'TransactionSent');
+    // recipient withdraws
     var otherBalance = web3.eth.getBalance(other1);
     var withdrawal = await partnership.withdraw(distrib, {from:other1});
     assert(withdrawal.logs[0].event === 'Withdrawal');
