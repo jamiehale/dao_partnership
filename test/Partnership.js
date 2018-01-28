@@ -13,8 +13,10 @@ contract('Partnership', function(accounts) {
   let attacker2 = accounts[5];
   let customer1 = accounts[6];
   let customer2 = accounts[7];
+  let other1 = accounts[8];
   let partnership;
-  let amount = new web3.BigNumber(web3.toWei(0.005, "ether"));
+  let amount = new web3.BigNumber(web3.toWei(5, "ether"));
+  let distrib = new web3.BigNumber(web3.toWei(2, "ether"));
   let loan = new web3.BigNumber(web3.toWei(0.103, "ether"));
 
   before(async function(){
@@ -98,6 +100,29 @@ contract('Partnership', function(accounts) {
     assert(withdrawal.logs[0].event === 'Withdrawal');
     // partner1 can't withdraw again.
     await expectThrow(partnership.withdraw(loan,{from:partner1}));
+  });
+
+  it('should allow distribution of ETH to any rando', async function(){
+    // create fund with two partners
+    partnership = await Partnership.new([partner1, partner2], amount);
+    await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
+    await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
+    var callData = partnership.contract.distribute.getData(other1, distrib);
+    var txn1 = await partnership.proposeTransaction(partnership.address, 0, callData, "distribute to rando", {from:partner1});
+    assert(txn1.logs[0].event === 'TransactionProposed');
+    var txnId1 = txn1.logs[0].args._id;
+    var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
+    assert(confirmation.logs[0].event === 'TransactionPassed');
+    var execution = await partnership.executeTransaction(txnId1,{from:partner1});
+    assert(execution.logs[0].event === 'TransactionSent');
+    var otherBalance = web3.eth.getBalance(other1);
+    var withdrawal = await partnership.withdraw(distrib, {from:other1});
+    assert(withdrawal.logs[0].event === 'Withdrawal');
+    // Make sure the numbers add up for the receiver (this is ridiculously tedious).
+    var txn = web3.eth.getTransaction(withdrawal.receipt.transactionHash);
+    var gasPrice = new web3.BigNumber(txn.gasPrice);
+    var gasUsed = new web3.BigNumber(withdrawal.receipt.gasUsed);
+    assert(otherBalance.plus(distrib).minus(gasUsed.times(gasPrice)).equals(web3.eth.getBalance(other1)));
   });
 
   // 
