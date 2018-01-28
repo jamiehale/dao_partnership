@@ -137,7 +137,7 @@ contract('Partnership', function(accounts) {
     var txn1 = await partnership.proposeTransaction(partnership.address, 0, callData, "distribute evenly", {from:partner1});
     assert(txn1.logs[0].event === 'TransactionProposed');
     var txnId1 = txn1.logs[0].args._id;
-    // approve dissolution proposal
+    // approve distribution proposal
     var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
     assert(confirmation.logs[0].event === 'TransactionPassed');
     // partner1 executes transaction
