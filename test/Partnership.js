@@ -2,6 +2,7 @@
 require('babel-register');
 
 var Partnership = artifacts.require('../contracts/Partnership.sol');
+var Incomplete = artifacts.require('../contracts/Incomplete.sol');
 var expectThrow = require('./helpers/expectThrow.js');
 
 contract('Partnership', function(accounts) {
@@ -137,6 +138,25 @@ contract('Partnership', function(accounts) {
     var gasPrice = new web3.BigNumber(txn.gasPrice);
     var gasUsed = new web3.BigNumber(withdrawal.receipt.gasUsed);
     assert(otherBalance.plus(distrib).minus(gasUsed.times(gasPrice)).equals(web3.eth.getBalance(other1)));
+  });
+
+  it('should test failed withdrawal', async function(){
+    // create fund with two partners
+    partnership = await Partnership.new([partner1, partner2], amount);
+    var incomplete = await Incomplete.new();
+    await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
+    await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
+    var callData = partnership.contract.distribute.getData(incomplete.address, distrib);
+    var txn1 = await partnership.proposeTransaction(partnership.address, amount, callData, "distribute to rando", {from:partner1});
+    assert(txn1.logs[0].event === 'TransactionProposed');
+    var txnId1 = txn1.logs[0].args._id;
+    // approve distribution proposal
+    var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
+    assert(confirmation.logs[0].event === 'TransactionPassed');
+    // partner1 executes transaction, which fails because incomplete won't accept the funds,
+    // but doesn't throw any exceptions
+    await partnership.executeTransaction(txnId1,{from:partner1});
+    await partnership.withdraw(distrib,{from:incomplete.address});
   });
 
   // 
