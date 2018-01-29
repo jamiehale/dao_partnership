@@ -193,6 +193,32 @@ contract('Partnership', function(accounts) {
     // but not the tokens ☹ 
   });
 
+  // Test failure scenarios
+  it('should handle failure to send in proposed transactions', async function(){
+    // create fund
+    partnership = await Partnership.new([partner1, partner2], amount);
+    await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
+    await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
+
+    // create an *unfunded* dao which will not accept money sent from others
+    var incomplete = await Partnership.new([partner2, partner3], amount);
+
+    // create proposal to distribute funds
+    var txn1 = await partnership.proposeTransaction(incomplete.address, 1, 101, "fail txn", {from:partner1});
+    assert(txn1.logs[0].event === 'TransactionProposed');
+    var txnId1 = txn1.logs[0].args._id;
+    // approve proposal
+    var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
+    assert(confirmation.logs[0].event === 'TransactionPassed');
+    // partner1 executes transaction, which fails because incomplete won't accept the funds,
+    // but doesn't throw any exceptions
+    await partnership.executeTransaction(txnId1,{from:partner1});
+    // TODO: a failed transaction can never be cancelled. It will haunt us forever.
+    // the transaction can be canceled
+    // var cancellation = await partnership.cancelTransaction(txnId1,{from:partner1});
+    // assert(cancellation.logs[0].event === 'TransactionCanceled');
+  });
+
 });
 /*
     var watcher = contract.Debug();
