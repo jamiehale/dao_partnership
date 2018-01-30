@@ -286,14 +286,11 @@ contract Partnership
 		// mark the withdrawal as successful
 		withdrawableAmounts[msg.sender] -= _amount;
 
-		// send the wei
-		if (msg.sender.send(_amount)) {
-			Withdrawal(msg.sender, _amount);
-		}
-		else {
-			// roll back if the send failed
-			withdrawableAmounts[msg.sender] += _amount;
-		}
+		// Log the withdrawal
+		Withdrawal(msg.sender, _amount);
+
+		// send the wei; if this fails the transaction fails.
+		require(msg.sender.send(_amount));
 	}
 	
 	/// Dissolve DAO and send the remaining ETH to a beneficiary
