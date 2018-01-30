@@ -4,6 +4,7 @@
   "private": true,
   "description": "partnership DAO",
   "devDependencies": {
+    "coveralls": "^3.0.0",
     "solidity-coverage": "^0.4.9",
     "solium": "^1.0.9",
     "truffle": "^4.0.4"
