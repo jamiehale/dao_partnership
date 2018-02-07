@@ -152,6 +152,7 @@ contract Partnership
 		partners = _partners;
 		sharePrice = _sharePrice;
 		for (uint i = 0; i < _partners.length; i++) {
+			// each partner must have a different address, or the contract can't launch.
 			require(!partnerRecords[_partners[i]].isPartner);
 			partnerRecords[_partners[i]].isPartner = true;
 		}
