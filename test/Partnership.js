@@ -2,6 +2,7 @@
 require('babel-register');
 
 var Partnership = artifacts.require('../contracts/Partnership.sol');
+var Incomplete = artifacts.require('../contracts/Incomplete.sol');
 var expectThrow = require('./helpers/expectThrow.js');
 
 contract('Partnership', function(accounts) {
@@ -137,6 +138,30 @@ contract('Partnership', function(accounts) {
     var gasPrice = new web3.BigNumber(txn.gasPrice);
     var gasUsed = new web3.BigNumber(withdrawal.receipt.gasUsed);
     assert(otherBalance.plus(distrib).minus(gasUsed.times(gasPrice)).equals(web3.eth.getBalance(other1)));
+  });
+
+  it('should test failed withdrawal', async function(){
+    // fund the Incomplete contract so it has some gas
+    var incomplete = await Incomplete.new();
+    await web3.eth.sendTransaction({from:creator, to:incomplete.address, value: amount});
+    // create fund with two partners
+    partnership = await Partnership.new([partner1, partner2], amount);
+    await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
+    await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
+    // propose transaction for withdrawal by Incomplete
+    var callData = partnership.contract.distribute.getData(incomplete.address, distrib);
+    var txn1 = await partnership.proposeTransaction(partnership.address, amount, callData, "distribute to rando", {from:partner1});
+    assert(txn1.logs[0].event === 'TransactionProposed');
+    var txnId1 = txn1.logs[0].args._id;
+    // approve distribution proposal
+    var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
+    assert(confirmation.logs[0].event === 'TransactionPassed');
+    // partner1 executes transaction, releasing funds for Incomplete
+    await partnership.executeTransaction(txnId1,{from:partner1});
+    // Incomplete calls partnership.withdrawal
+    var callData = partnership.contract.withdraw.getData(distrib);
+    // This fails because Incomplete rejects the send of ether
+    await expectThrow(incomplete.run(0, callData));
   });
 
   // 
