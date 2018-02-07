@@ -79,6 +79,11 @@ contract('Partnership', function(accounts) {
     await expectThrow(partnership.proposeTransaction(attacker1, amount, 0, "fraud",{from:attacker1}));
   });
 
+  // This cannot be allowed because it means they can never be funded
+  it('should not allow duplicate partner accounts', async function(){
+    await expectThrow(Partnership.new([partner1, partner1], amount));
+  });
+
   it('should allow only partners to make loans and withdraw them', async function(){
     // create fund with two partners
     partnership = await Partnership.new([partner1, partner2], amount);

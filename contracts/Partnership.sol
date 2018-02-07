@@ -144,11 +144,15 @@ contract Partnership
 		_;
 	}
 
+	/// Constructor to set up the partnership: an array of addresses for the `_partners`
+	/// and the `_sharePrice` that each partner must send to the contract for the
+	/// partnership to launch.
 	function Partnership(address[] _partners, uint _sharePrice) public {
 		funded = false;
 		partners = _partners;
 		sharePrice = _sharePrice;
 		for (uint i = 0; i < _partners.length; i++) {
+			require(!partnerRecords[_partners[i]].isPartner);
 			partnerRecords[_partners[i]].isPartner = true;
 		}
 		partnerCount = _partners.length;
