@@ -11,7 +11,6 @@ if( args.length < 3 ){
 }
 
 var amount = new web3.BigNumber(web3.toWei(args[0], "ether"))
-console.log("amount: " + amount);
 
 for (i = 1; i < args.length; i++){
   if (!web3.isAddress(args[i])){
@@ -29,5 +28,6 @@ var factory = web3.eth.contract(JSON.parse(pship.interface));
 
 var byteCode = factory.new.getData(args.slice(1),amount,{data:pship.runtimeBytecode});
 var params = byteCode.substr(pship.runtimeBytecode.length, byteCode.length - pship.runtimeBytecode.length)
-console.log("These are the params you'll need to verify your contract on Etherscan.");
-console.log(params);
+fs.writeFileSync('bytecode.txt', byteCode);
+fs.writeFileSync('arguments.txt', params);
+console.log("Files created: bytecode.txt and arguments.txt.");
