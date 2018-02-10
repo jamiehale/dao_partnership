@@ -144,6 +144,8 @@ contract('Partnership', function(accounts) {
     // partner1 approves payback proposal
     var confirmation = await partnership.confirmTransaction(txnId1,{from:partner1});
     assert(confirmation.logs[0].event === 'TransactionPassed');
+    // you may only confirm once.
+    await expectThrow(partnership.confirmTransaction(txnId1,{from:partner1}));
     // partner1 can't withdraw yet.
     await expectThrow(partnership.withdraw(loan,{from:partner1}));
     // partner2 executes transaction
