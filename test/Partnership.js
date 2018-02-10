@@ -67,19 +67,23 @@ contract('Partnership', function(accounts) {
     // create fund with two partners
     partnership = await Partnership.new([partner1, partner2], amount);
     await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
-    // should not be able to propse a transaction until the partnership is funded
+    // should not be able to propose a transaction until the partnership is funded
     await expectThrow(partnership.proposeTransaction(customer2, amount, 0, "refund", {from:partner1}));
     await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
     // create proposal to send ether
     var txn1 = await partnership.proposeTransaction(customer2, amount, 0, "refund", {from:partner1});
     assert(txn1.logs[0].event === 'TransactionProposed');
     var txnId1 = txn1.logs[0].args._id;
+    // should not be executable until it is passed by all partners
+    await expectThrow(partnership.executeTransaction(txnId1,{from:partner1}));
     // partner who did not create the proposal should not be able to cancel it
     await expectThrow(partnership.cancelTransaction(txnId1,{from:partner2}));
     // but should be able to confirm it
     var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
     assert(confirmation.logs[0].event === 'TransactionPassed');
-    // and the first partner should be able to confirm it
+    // once the transaction is passed, it cannot be cancelled
+    await expectThrow(partnership.cancelTransaction(txnId1,{from:partner1}));
+    // the first partner should be able to execute 
     var execution = await partnership.executeTransaction(txnId1,{from:partner1});
     assert(execution.logs[0].event === 'TransactionSent');
 
@@ -90,6 +94,8 @@ contract('Partnership', function(accounts) {
     await expectThrow(partnership.cancelTransaction(txnId2,{from:partner2}));
     // randos should not be able to cancel a proposal
     await expectThrow(partnership.cancelTransaction(txnId2,{from:attacker1}));
+    // transaction ID must be valid
+    await expectThrow(partnership.cancelTransaction(0x0101,{from:partner1}));
     // initiator should be able to cancel a proposal
     var cancellation = await partnership.cancelTransaction(txnId2,{from:partner1});
     assert(cancellation.logs[0].event === 'TransactionCanceled');
