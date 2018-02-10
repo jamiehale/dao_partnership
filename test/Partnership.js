@@ -86,6 +86,8 @@ contract('Partnership', function(accounts) {
     // the first partner should be able to execute 
     var execution = await partnership.executeTransaction(txnId1,{from:partner1});
     assert(execution.logs[0].event === 'TransactionSent');
+    // but you can only execute it once
+    await expectThtrow(partnership.executeTransaction(txnId1,{from:partner1}));
 
     // test cancellation of a valid proposal
     var txn2 = await partnership.proposeTransaction(customer2, amount, 0, "refund", {from:partner1});
