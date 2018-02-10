@@ -23,7 +23,7 @@ contract('Partnership', function(accounts) {
   before(async function(){
 	});
 
-  // 
+  // Test initial funding participation
   it('should only allow partners to participate in the initial funding', async function(){
     // create fund with three partners
     partnership = await Partnership.new([partner1, partner2, partner3], amount);
@@ -41,6 +41,22 @@ contract('Partnership', function(accounts) {
     // why does the above work but this does not?
     // expectThrow(web3.eth.sendTransaction({from:attacker1, to:partnership.address, value: amount}));
 
+    // A partner should not be able to make a *duplicate* contribution
+    try {
+      await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
+    } catch (error) {
+      const revert = error.message.search('revert') >= 0;
+      assert(revert);
+    }
+
+    // A partner should not be able to make an *excess* contribution
+    try {
+      await web3.eth.sendTransaction({from:partner3, to:partnership.address, value: amount*2});
+    } catch (error) {
+      const revert = error.message.search('revert') >= 0;
+      assert(revert);
+    }
+
     // partner 3 contributes to the fund, making it funded.
     await web3.eth.sendTransaction({from:partner3, to:partnership.address, value: amount});
     // since funding is now complete, the customer should be able to send ether
@@ -51,6 +67,8 @@ contract('Partnership', function(accounts) {
     // create fund with two partners
     partnership = await Partnership.new([partner1, partner2], amount);
     await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
+    // should not be able to propse a transaction until the partnership is funded
+    await expectThrow(partnership.proposeTransaction(customer2, amount, 0, "refund", {from:partner1}));
     await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
     // create proposal to send ether
     var txn1 = await partnership.proposeTransaction(customer2, amount, 0, "refund", {from:partner1});
@@ -83,6 +101,20 @@ contract('Partnership', function(accounts) {
   // This cannot be allowed because it means they can never be funded
   it('should not allow duplicate partner accounts', async function(){
     await expectThrow(Partnership.new([partner1, partner1], amount));
+  });
+
+  // no-value sends are ignored
+  it('should not react to zero-amount sends', async function(){
+    partnership = await Partnership.new([partner1, partner2], amount);
+    // test when unfunded
+    await web3.eth.sendTransaction({from:attacker1, to:partnership.address, value: 0});
+    await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: 0});
+    // fund the partnership...
+    await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
+    await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
+    // test when funded
+    await web3.eth.sendTransaction({from:attacker1, to:partnership.address, value: 0});
+    await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: 0});
   });
 
   it('should allow only partners to make loans and withdraw them', async function(){
@@ -143,6 +175,8 @@ contract('Partnership', function(accounts) {
     var gasPrice = new web3.BigNumber(txn.gasPrice);
     var gasUsed = new web3.BigNumber(withdrawal.receipt.gasUsed);
     assert(otherBalance.plus(distrib).minus(gasUsed.times(gasPrice)).equals(web3.eth.getBalance(other1)));
+    // can't be called directly
+    await expectThrow(partnership.distribute(partner2, amount, {from:partner1}));
   });
 
   it('should test failed withdrawal', async function(){
@@ -198,6 +232,8 @@ contract('Partnership', function(accounts) {
     assert(withdrawal.logs[0].event === 'Withdrawal');
     // partners can't withdrawal again
     await expectThrow(partnership.withdraw(amount, {from:partner1}));
+    // can't be called directly
+    await expectThrow(partnership.distributeEvenly(amount, {from:partner1}));
   });
 
   // dissolving a fund is not a good idea because it abandons tokens.
