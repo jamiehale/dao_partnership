@@ -174,7 +174,6 @@ contract('Partnership', function(accounts) {
     // partner2 executes transaction
     var execution = await partnership.executeTransaction(txnId1,{from:partner2});
     assert(execution.logs[0].event === 'TransactionSent');
-    console.log(execution);
     // partner1 executes transactions, which fail to emit any events
     execution = await partnership.executeTransaction(txnId2,{from:partner1});
     assert(!execution.logs[0]);
