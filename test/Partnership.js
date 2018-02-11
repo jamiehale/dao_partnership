@@ -130,34 +130,65 @@ contract('Partnership', function(accounts) {
     partnership = await Partnership.new([partner1, partner2], amount);
     await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
     await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
-    // parter1 sends loan
+    // parter1 and partner2 each sends a loan
     await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: loan});
+    await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: loan});
     // nobody can withdraw 
     await expectThrow(partnership.withdraw(loan,{from:partner1}));
     await expectThrow(partnership.withdraw(loan,{from:partner2}));
     await expectThrow(partnership.withdraw(loan,{from:attacker1}));
-    // partner2 creates proposal to pay back loan
+    // You can't call repayLoan directly
+    expectThrow(partnership.repayLoan(partner1, loan, {from:partner2}));
+    // partner2 creates proposals to pay back loan
     var callData = partnership.contract.repayLoan.getData(partner1, loan);
     var txn1 = await partnership.proposeTransaction(partnership.address, 0, callData, "repay loan", {from:partner2});
     assert(txn1.logs[0].event === 'TransactionProposed');
+    // repays loan... to attacker! oops!
+    callData = partnership.contract.repayLoan.getData(attacker1, loan);
+    var txn2 = await partnership.proposeTransaction(partnership.address, 0, callData, "repay loan - to attacker", {from:partner1});
+    assert(txn2.logs[0].event === 'TransactionProposed');
+    // attempts to repay DOUBLE the loan
+    callData = partnership.contract.repayLoan.getData(partner2, loan*2);
+    var txn3 = await partnership.proposeTransaction(partnership.address, 0, callData, "repay double the loan", {from:partner1});
+    assert(txn3.logs[0].event === 'TransactionProposed');
     var txnId1 = txn1.logs[0].args._id;
-    // partner1 can't withdraw yet.
+    var txnId2 = txn2.logs[0].args._id;
+    var txnId3 = txn3.logs[0].args._id;
+    // neither partner can withdraw, transactions not executed.
     await expectThrow(partnership.withdraw(loan,{from:partner1}));
-    // partner1 approves payback proposal
+    await expectThrow(partnership.withdraw(loan,{from:partner2}));
+    // partner approves payback proposal
     var confirmation = await partnership.confirmTransaction(txnId1,{from:partner1});
+    assert(confirmation.logs[0].event === 'TransactionPassed');
+    confirmation = await partnership.confirmTransaction(txnId2,{from:partner2});
+    assert(confirmation.logs[0].event === 'TransactionPassed');
+    confirmation = await partnership.confirmTransaction(txnId3,{from:partner2});
     assert(confirmation.logs[0].event === 'TransactionPassed');
     // you may only confirm once.
     await expectThrow(partnership.confirmTransaction(txnId1,{from:partner1}));
-    // partner1 can't withdraw yet.
+    // neither partner can withdraw, transactions not executed.
     await expectThrow(partnership.withdraw(loan,{from:partner1}));
+    await expectThrow(partnership.withdraw(loan,{from:partner2}));
+    // attacker can't withdraw
+    await expectThrow(partnership.withdraw(loan,{from:attacker1}));
     // partner2 executes transaction
     var execution = await partnership.executeTransaction(txnId1,{from:partner2});
     assert(execution.logs[0].event === 'TransactionSent');
+    console.log(execution);
+    // partner1 executes transactions, which fail to emit any events
+    execution = await partnership.executeTransaction(txnId2,{from:partner1});
+    assert(!execution.logs[0]);
+    execution = await partnership.executeTransaction(txnId3,{from:partner1});
+    assert(!execution.logs[0]);
     // partner1 makes a withdrawal of the loan
     var withdrawal = await partnership.withdraw(loan, {from:partner1});
     assert(withdrawal.logs[0].event === 'Withdrawal');
     // partner1 can't withdraw again.
     await expectThrow(partnership.withdraw(loan,{from:partner1}));
+    // partner2 can't withdraw
+    await expectThrow(partnership.withdraw(loan,{from:partner2}));
+    // attacker can't withdraw
+    await expectThrow(partnership.withdraw(loan,{from:attacker1}));
   });
 
   it('should allow distribution of ETH to any rando', async function(){
