@@ -282,16 +282,34 @@ contract('Partnership', function(accounts) {
     partnership = await Partnership.new([partner1, partner2], amount);
     await web3.eth.sendTransaction({from:partner1, to:partnership.address, value: amount});
     await web3.eth.sendTransaction({from:partner2, to:partnership.address, value: amount});
-    // create proposal to dissolve
+    // create proposals to dissolve: one right, two wrong
     var callData = partnership.contract.dissolve.getData(customer1);
     var txn1 = await partnership.proposeTransaction(partnership.address, 0, callData, "dissolve", {from:partner1});
+    // test onlyValidBeneficiary branches
+    callData = partnership.contract.dissolve.getData(partnership.address);
+    var txn2 = await partnership.proposeTransaction(partnership.address, 0, callData, "dissolve", {from:partner1});
+    callData = partnership.contract.dissolve.getData(0);
+    var txn3 = await partnership.proposeTransaction(partnership.address, 0, callData, "dissolve", {from:partner1});
     assert(txn1.logs[0].event === 'TransactionProposed');
+    assert(txn2.logs[0].event === 'TransactionProposed');
+    assert(txn3.logs[0].event === 'TransactionProposed');
     var txnId1 = txn1.logs[0].args._id;
-    // approve dissolution proposal
+    var txnId2 = txn2.logs[0].args._id;
+    var txnId3 = txn3.logs[0].args._id;
+    // approve dissolution proposals
     var confirmation = await partnership.confirmTransaction(txnId1,{from:partner2});
     assert(confirmation.logs[0].event === 'TransactionPassed');
+    confirmation = await partnership.confirmTransaction(txnId2,{from:partner2});
+    assert(confirmation.logs[0].event === 'TransactionPassed');
+    confirmation = await partnership.confirmTransaction(txnId3,{from:partner2});
+    assert(confirmation.logs[0].event === 'TransactionPassed');
     var customerBalance = web3.eth.getBalance(customer1);
-    // partner1 executes transaction
+    // Failed transactions produce no log entries
+    execution = await partnership.executeTransaction(txnId2,{from:partner1});
+    assert(!execution.logs[0]);
+    execution = await partnership.executeTransaction(txnId3,{from:partner1});
+    assert(!execution.logs[0]);
+    // partner1 executes transaction and murders the contract
     var execution = await partnership.executeTransaction(txnId1,{from:partner1});
     assert(execution.logs[0].event === 'TransactionSent');
     // recipient should have the eth ☺
