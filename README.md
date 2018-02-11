@@ -16,16 +16,15 @@ click Deploy Contract
 Paste the contents of `bytecode.txt` into the Byte Code field
 ... access your wallet and deploy the contract.
 
-Once the contract has been created, go to [Etherscan's Contract Verifier](https://etherscan.io/verifyContract2).
-
-Contract Address: the deployed address of your contract
-Contract Name: Partnership
-Compiler: the version returned when you ran `node prepare.js` above.
-Optimization: Yes
-Enter the Solidity Contract Code: Paste the contents of `contracts/Partnership.sol`
-Constructor Arguments ABI-encoded: Paste the contents of `arguments.txt`
-Solve the CAPTCHA
-Click **Verify and Publish**
+Once the contract has been created, go to [Etherscan's Contract Verifier](https://etherscan.io/verifyContract2):
+* Contract Address: the deployed address of your contract
+* Contract Name: Partnership
+* Compiler: the version returned when you ran `node prepare.js` above.
+* Optimization: Yes
+* Enter the Solidity Contract Code: Paste the contents of `contracts/Partnership.sol`
+* Constructor Arguments ABI-encoded: Paste the contents of `arguments.txt`
+* Solve the CAPTCHA
+* Click **Verify and Publish**
 
 Now each of the partners listed given to `prepare.js` above need to send the exact amount specified to the contract address, from each specific account (not from an exchange). Until this is done the contract will not accept ether from any other source.
 
