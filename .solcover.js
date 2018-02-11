@@ -1,3 +1,3 @@
 module.exports = {
-      skipFiles: ['contracts/Incomplete.sol']
+      skipFiles: ['Incomplete.sol']
 };
