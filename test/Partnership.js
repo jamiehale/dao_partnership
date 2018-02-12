@@ -124,7 +124,7 @@ contract('Partnership', (accounts) => { // eslint-disable-line no-undef
     const partnership = await Partnership.new([partner1, partner2], amount);
     await web3.eth.sendTransaction({ from: partner1, to: partnership.address, value: amount }); // eslint-disable-line no-undef
     await web3.eth.sendTransaction({ from: partner2, to: partnership.address, value: amount }); // eslint-disable-line no-undef
-    // parter1 and partner2 each sends a loan
+    // parter1 and partner2 each send a loan
     await web3.eth.sendTransaction({ from: partner1, to: partnership.address, value: loan }); // eslint-disable-line no-undef
     await web3.eth.sendTransaction({ from: partner2, to: partnership.address, value: loan }); // eslint-disable-line no-undef
     // nobody can withdraw
