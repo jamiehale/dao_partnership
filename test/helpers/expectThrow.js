@@ -1,5 +1,5 @@
 // adapted from https://github.com/OpenZeppelin/zeppelin-solidity/blob/master/test/helpers/expectThrow.js
-module.exports = async promise => {
+module.exports = async (promise) => {
   try {
     await promise;
   } catch (error) {
@@ -12,11 +12,11 @@ module.exports = async promise => {
     //       testrpc log actually show an 'invalid jump' event.)
     const outOfGas = error.message.search('out of gas') >= 0;
     const revert = error.message.search('revert') >= 0;
-    assert(
+    assert( // eslint-disable-line no-undef
       invalidOpcode || outOfGas || revert,
-      'Expected throw, got \'' + error + '\' instead',
+      `Expected throw, got '${error}' instead`,
     );
     return;
   }
-  assert.fail('Expected throw not received');
+  assert.fail('Expected throw not received'); // eslint-disable-line no-undef
 };
