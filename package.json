@@ -5,6 +5,9 @@
   "description": "partnership DAO",
   "devDependencies": {
     "coveralls": "^3.0.0",
+    "eslint": "^4.17.0",
+    "eslint-config-airbnb-base": "^12.1.0",
+    "eslint-plugin-import": "^2.8.0",
     "solidity-coverage": "^0.4.9",
     "solium": "^1.0.9",
     "truffle": "^4.0.4"
@@ -13,9 +16,12 @@
   "scripts": {
     "build": "./node_modules/.bin/truffle compile",
     "coverage": "./node_modules/.bin/solidity-coverage",
+    "lint": "./node_modules/.bin/eslint .",
     "test": "./node_modules/.bin/truffle test"
   },
   "dependencies": {
-    "babel-register": "^6.26.0"
+    "babel-register": "^6.26.0",
+    "solc": "^0.4.19",
+    "web3": "^1.0.0-beta.29"
   }
 }
