@@ -33,7 +33,23 @@ contract('Partnership', (accounts) => { // eslint-disable-line no-undef
       assert(revert); // eslint-disable-line no-undef
     }
     // why does the above work but this does not?
-    // expectThrow(web3.eth.sendTransaction({from:attacker1, to:partnership.address, value: amount}));
+    // expectThrow(web3.eth.sendTransaction({ from: attacker1, to: partnership.address, value: amount }));
+
+    // A partner should not be able to make a *duplicate* contribution
+    try {
+      await web3.eth.sendTransaction({ from: partner2, to: partnership.address, value: amount }); // eslint-disable-line no-undef
+    } catch (error) {
+      const revert = error.message.search('revert') >= 0;
+      assert(revert); // eslint-disable-line no-undef
+    }
+
+    // A partner should not be able to make an *excess* contribution
+    try {
+      await web3.eth.sendTransaction({ from: partner3, to: partnership.address, value: amount * 2 }); // eslint-disable-line no-undef
+    } catch (error) {
+      const revert = error.message.search('revert') >= 0;
+      assert(revert); // eslint-disable-line no-undef
+    }
 
     // partner 3 contributes to the fund, making it funded.
     await web3.eth.sendTransaction({ from: partner3, to: partnership.address, value: amount }); // eslint-disable-line no-undef
@@ -45,19 +61,27 @@ contract('Partnership', (accounts) => { // eslint-disable-line no-undef
     // create fund with two partners
     const partnership = await Partnership.new([partner1, partner2], amount);
     await web3.eth.sendTransaction({ from: partner1, to: partnership.address, value: amount }); // eslint-disable-line no-undef
+    // should not be able to propose a transaction until the partnership is funded
+    await expectThrow(partnership.proposeTransaction(customer2, amount, 0, 'refund', { from: partner1 }));
     await web3.eth.sendTransaction({ from: partner2, to: partnership.address, value: amount }); // eslint-disable-line no-undef
     // create proposal to send ether
     const txn1 = await partnership.proposeTransaction(customer2, amount, 0, 'refund', { from: partner1 });
     assert(txn1.logs[0].event === 'TransactionProposed'); // eslint-disable-line no-undef
     const txnId1 = txn1.logs[0].args._id; // eslint-disable-line no-underscore-dangle
+    // should not be executable until it is passed by all partners
+    await expectThrow(partnership.executeTransaction(txnId1, { from: partner1 }));
     // partner who did not create the proposal should not be able to cancel it
     await expectThrow(partnership.cancelTransaction(txnId1, { from: partner2 }));
     // but should be able to confirm it
     const confirmation = await partnership.confirmTransaction(txnId1, { from: partner2 });
     assert(confirmation.logs[0].event === 'TransactionPassed'); // eslint-disable-line no-undef
-    // and the first partner should be able to confirm it
+    // once the transaction is passed, it cannot be cancelled
+    await expectThrow(partnership.cancelTransaction(txnId1, { from: partner1 }));
+    // the first partner should be able to execute
     const execution = await partnership.executeTransaction(txnId1, { from: partner1 });
     assert(execution.logs[0].event === 'TransactionSent'); // eslint-disable-line no-undef
+    // but you can only execute it once
+    await expectThrow(partnership.executeTransaction(txnId1, { from: partner1 }));
 
     // test cancellation of a valid proposal
     const txn2 = await partnership.proposeTransaction(customer2, amount, 0, 'refund', { from: partner1 });
@@ -66,6 +90,8 @@ contract('Partnership', (accounts) => { // eslint-disable-line no-undef
     await expectThrow(partnership.cancelTransaction(txnId2, { from: partner2 }));
     // randos should not be able to cancel a proposal
     await expectThrow(partnership.cancelTransaction(txnId2, { from: attacker1 }));
+    // transaction ID must be valid
+    await expectThrow(partnership.cancelTransaction(0x0101, { from: partner1 }));
     // initiator should be able to cancel a proposal
     const cancellation = await partnership.cancelTransaction(txnId2, { from: partner1 });
     assert(cancellation.logs[0].event === 'TransactionCanceled'); // eslint-disable-line no-undef
@@ -79,37 +105,83 @@ contract('Partnership', (accounts) => { // eslint-disable-line no-undef
     await expectThrow(Partnership.new([partner1, partner1], amount));
   });
 
+  // no-value sends are ignored
+  it('should not react to zero-amount sends', async () => { // eslint-disable-line no-undef
+    const partnership = await Partnership.new([partner1, partner2], amount);
+    // test when unfunded
+    await web3.eth.sendTransaction({ from: attacker1, to: partnership.address, value: 0 }); // eslint-disable-line no-undef
+    await web3.eth.sendTransaction({ from: partner1, to: partnership.address, value: 0 }); // eslint-disable-line no-undef
+    // fund the partnership...
+    await web3.eth.sendTransaction({ from: partner1, to: partnership.address, value: amount }); // eslint-disable-line no-undef
+    await web3.eth.sendTransaction({ from: partner2, to: partnership.address, value: amount }); // eslint-disable-line no-undef
+    // test when funded
+    await web3.eth.sendTransaction({ from: attacker1, to: partnership.address, value: 0 }); // eslint-disable-line no-undef
+    await web3.eth.sendTransaction({ from: partner1, to: partnership.address, value: 0 }); // eslint-disable-line no-undef
+  });
+
   it('should allow only partners to make loans and withdraw them', async () => { // eslint-disable-line no-undef
     // create fund with two partners
     const partnership = await Partnership.new([partner1, partner2], amount);
     await web3.eth.sendTransaction({ from: partner1, to: partnership.address, value: amount }); // eslint-disable-line no-undef
     await web3.eth.sendTransaction({ from: partner2, to: partnership.address, value: amount }); // eslint-disable-line no-undef
-    // parter1 sends loan
+    // parter1 and partner2 each send a loan
     await web3.eth.sendTransaction({ from: partner1, to: partnership.address, value: loan }); // eslint-disable-line no-undef
+    await web3.eth.sendTransaction({ from: partner2, to: partnership.address, value: loan }); // eslint-disable-line no-undef
     // nobody can withdraw
     await expectThrow(partnership.withdraw(loan, { from: partner1 }));
     await expectThrow(partnership.withdraw(loan, { from: partner2 }));
     await expectThrow(partnership.withdraw(loan, { from: attacker1 }));
-    // partner2 creates proposal to pay back loan
-    const callData = partnership.contract.repayLoan.getData(partner1, loan);
+    // You can't call repayLoan directly
+    expectThrow(partnership.repayLoan(partner1, loan, { from: partner2 }));
+    // partner2 creates proposals to pay back loan
+    let callData = partnership.contract.repayLoan.getData(partner1, loan);
     const txn1 = await partnership.proposeTransaction(partnership.address, 0, callData, 'repay loan', { from: partner2 });
     assert(txn1.logs[0].event === 'TransactionProposed'); // eslint-disable-line no-undef
+    // repays loan... to attacker! oops!
+    callData = partnership.contract.repayLoan.getData(attacker1, loan);
+    const txn2 = await partnership.proposeTransaction(partnership.address, 0, callData, 'repay loan - to attacker', { from: partner1 });
+    assert(txn2.logs[0].event === 'TransactionProposed'); // eslint-disable-line no-undef
+    // attempts to repay DOUBLE the loan
+    callData = partnership.contract.repayLoan.getData(partner2, loan * 2);
+    const txn3 = await partnership.proposeTransaction(partnership.address, 0, callData, 'repay double the loan', { from: partner1 });
+    assert(txn3.logs[0].event === 'TransactionProposed'); // eslint-disable-line no-undef
     const txnId1 = txn1.logs[0].args._id; // eslint-disable-line no-underscore-dangle
-    // partner1 can't withdraw yet.
+    const txnId2 = txn2.logs[0].args._id; // eslint-disable-line no-underscore-dangle
+    const txnId3 = txn3.logs[0].args._id; // eslint-disable-line no-underscore-dangle
+    // neither partner can withdraw, transactions not executed.
     await expectThrow(partnership.withdraw(loan, { from: partner1 }));
-    // partner1 approves payback proposal
-    const confirmation = await partnership.confirmTransaction(txnId1, { from: partner1 });
+    await expectThrow(partnership.withdraw(loan, { from: partner2 }));
+    // partner approves payback proposal
+    let confirmation = await partnership.confirmTransaction(txnId1, { from: partner1 });
     assert(confirmation.logs[0].event === 'TransactionPassed'); // eslint-disable-line no-undef
-    // partner1 can't withdraw yet.
+    confirmation = await partnership.confirmTransaction(txnId2, { from: partner2 });
+    assert(confirmation.logs[0].event === 'TransactionPassed'); // eslint-disable-line no-undef
+    confirmation = await partnership.confirmTransaction(txnId3, { from: partner2 });
+    assert(confirmation.logs[0].event === 'TransactionPassed'); // eslint-disable-line no-undef
+    // you may only confirm once.
+    await expectThrow(partnership.confirmTransaction(txnId1, { from: partner1 }));
+    // neither partner can withdraw, transactions not executed.
     await expectThrow(partnership.withdraw(loan, { from: partner1 }));
+    await expectThrow(partnership.withdraw(loan, { from: partner2 }));
+    // attacker can't withdraw
+    await expectThrow(partnership.withdraw(loan, { from: attacker1 }));
     // partner2 executes transaction
-    const execution = await partnership.executeTransaction(txnId1, { from: partner2 });
+    let execution = await partnership.executeTransaction(txnId1, { from: partner2 });
     assert(execution.logs[0].event === 'TransactionSent'); // eslint-disable-line no-undef
+    // partner1 executes transactions, which fail to emit any events
+    execution = await partnership.executeTransaction(txnId2, { from: partner1 });
+    assert(!execution.logs[0]); // eslint-disable-line no-undef
+    execution = await partnership.executeTransaction(txnId3, { from: partner1 });
+    assert(!execution.logs[0]); // eslint-disable-line no-undef
     // partner1 makes a withdrawal of the loan
     const withdrawal = await partnership.withdraw(loan, { from: partner1 });
     assert(withdrawal.logs[0].event === 'Withdrawal'); // eslint-disable-line no-undef
     // partner1 can't withdraw again.
     await expectThrow(partnership.withdraw(loan, { from: partner1 }));
+    // partner2 can't withdraw
+    await expectThrow(partnership.withdraw(loan, { from: partner2 }));
+    // attacker can't withdraw
+    await expectThrow(partnership.withdraw(loan, { from: attacker1 }));
   });
 
   it('should allow distribution of ETH to any rando', async () => { // eslint-disable-line no-undef
@@ -137,6 +209,8 @@ contract('Partnership', (accounts) => { // eslint-disable-line no-undef
     const gasPrice = new web3.BigNumber(txn.gasPrice); // eslint-disable-line no-undef
     const gasUsed = new web3.BigNumber(withdrawal.receipt.gasUsed); // eslint-disable-line no-undef
     assert(otherBalance.plus(distrib).minus(gasUsed.times(gasPrice)).equals(web3.eth.getBalance(other1))); // eslint-disable-line no-undef
+    // can't be called directly
+    await expectThrow(partnership.distribute(partner2, amount, { from: partner1 }));
   });
 
   it('should test failed withdrawal', async () => { // eslint-disable-line no-undef
@@ -191,6 +265,8 @@ contract('Partnership', (accounts) => { // eslint-disable-line no-undef
     assert(withdrawal.logs[0].event === 'Withdrawal'); // eslint-disable-line no-undef
     // partners can't withdrawal again
     await expectThrow(partnership.withdraw(amount, { from: partner1 }));
+    // can't be called directly
+    await expectThrow(partnership.distributeEvenly(amount, { from: partner1 }));
   });
 
   // dissolving a fund is not a good idea because it abandons tokens.
@@ -199,17 +275,35 @@ contract('Partnership', (accounts) => { // eslint-disable-line no-undef
     const partnership = await Partnership.new([partner1, partner2], amount);
     await web3.eth.sendTransaction({ from: partner1, to: partnership.address, value: amount }); // eslint-disable-line no-undef
     await web3.eth.sendTransaction({ from: partner2, to: partnership.address, value: amount }); // eslint-disable-line no-undef
-    // create proposal to dissolve
-    const callData = partnership.contract.dissolve.getData(customer1);
+    // create proposals to dissolve: one right, two wrong
+    let callData = partnership.contract.dissolve.getData(customer1);
     const txn1 = await partnership.proposeTransaction(partnership.address, 0, callData, 'dissolve', { from: partner1 });
+    // test onlyValidBeneficiary branches
+    callData = partnership.contract.dissolve.getData(partnership.address);
+    const txn2 = await partnership.proposeTransaction(partnership.address, 0, callData, 'dissolve', { from: partner1 });
+    callData = partnership.contract.dissolve.getData(0);
+    const txn3 = await partnership.proposeTransaction(partnership.address, 0, callData, 'dissolve', { from: partner1 });
     assert(txn1.logs[0].event === 'TransactionProposed'); // eslint-disable-line no-undef
+    assert(txn2.logs[0].event === 'TransactionProposed'); // eslint-disable-line no-undef
+    assert(txn3.logs[0].event === 'TransactionProposed'); // eslint-disable-line no-undef
     const txnId1 = txn1.logs[0].args._id; // eslint-disable-line no-underscore-dangle
-    // approve dissolution proposal
-    const confirmation = await partnership.confirmTransaction(txnId1, { from: partner2 });
+    const txnId2 = txn2.logs[0].args._id; // eslint-disable-line no-underscore-dangle
+    const txnId3 = txn3.logs[0].args._id; // eslint-disable-line no-underscore-dangle
+    // approve dissolution proposals
+    let confirmation = await partnership.confirmTransaction(txnId1, { from: partner2 });
+    assert(confirmation.logs[0].event === 'TransactionPassed'); // eslint-disable-line no-undef
+    confirmation = await partnership.confirmTransaction(txnId2, { from: partner2 });
+    assert(confirmation.logs[0].event === 'TransactionPassed'); // eslint-disable-line no-undef
+    confirmation = await partnership.confirmTransaction(txnId3, { from: partner2 });
     assert(confirmation.logs[0].event === 'TransactionPassed'); // eslint-disable-line no-undef
     const customerBalance = web3.eth.getBalance(customer1); // eslint-disable-line no-undef
-    // partner1 executes transaction
-    const execution = await partnership.executeTransaction(txnId1, { from: partner1 });
+    // Failed transactions produce no log entries
+    let execution = await partnership.executeTransaction(txnId2, { from: partner1 });
+    assert(!execution.logs[0]); // eslint-disable-line no-undef
+    execution = await partnership.executeTransaction(txnId3, { from: partner1 });
+    assert(!execution.logs[0]); // eslint-disable-line no-undef
+    // partner1 executes transaction and murders the contract
+    execution = await partnership.executeTransaction(txnId1, { from: partner1 });
     assert(execution.logs[0].event === 'TransactionSent'); // eslint-disable-line no-undef
     // recipient should have the eth ☺
     assert.equal(web3.eth.getBalance(customer1) - customerBalance, amount * 2); // eslint-disable-line no-undef
@@ -238,8 +332,8 @@ contract('Partnership', (accounts) => { // eslint-disable-line no-undef
     await partnership.executeTransaction(txnId1, { from: partner1 });
     // TODO: a failed transaction can never be cancelled. It will haunt us forever.
     // the transaction can be canceled
-    // const cancellation = await partnership.cancelTransaction(txnId1,{from:partner1});
-    // assert(cancellation.logs[0].event === 'TransactionCanceled');
+    // const cancellation = await partnership.cancelTransaction(txnId1, { from: partner1 });
+    // assert(cancellation.logs[0].event === 'TransactionCanceled'); // eslint-disable-line no-undef
   });
 });
 /*

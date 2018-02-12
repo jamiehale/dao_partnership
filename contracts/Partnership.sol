@@ -295,7 +295,7 @@ contract Partnership
 		Withdrawal(msg.sender, _amount);
 
 		// send the wei; if this fails the transaction fails.
-		require(msg.sender.send(_amount));
+		msg.sender.transfer(_amount);
 	}
 	
 	/// Dissolve DAO and send the remaining ETH to a beneficiary

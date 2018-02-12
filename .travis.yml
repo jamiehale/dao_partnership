@@ -6,6 +6,7 @@ install:
   - npm install -g ganache-cli
   - npm install
 script:
+  - npm run lint
   - npm test
 before_script:
   - testrpc > /dev/null &
