@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/jamiehale/dao_partnership.svg?branch=master)](https://travis-ci.org/jamiehale/dao_partnership)
+[![Coverage Status](https://coveralls.io/repos/github/jamiehale/dao_partnership/badge.svg?branch=master)](https://coveralls.io/github/jamiehale/dao_partnership?branch=master)
+
 A DAO for a simple partnership, written in Solidity for deployment on Ethereum.
 
 # Usage
