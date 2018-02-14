@@ -8,7 +8,7 @@ The preferred deployment method is to prepare a transaction for submission using
 
 After [installation](#Installation):
 
-You'll need to decide on a single amount that all partners will contribute. It must be the same.
+First, decide on a single amount that all partners will contribute. It must be the same for all partners. Enter this amount (in ETH) as the `ether_amount` below, followed by the Ethereum addresses of each partner.
 
     $ node prepare.js ether_amount parter1_addr partner2_addr [partner3_addr ...]
 
