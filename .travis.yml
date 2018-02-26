@@ -7,9 +7,7 @@ install:
   - npm install
 script:
   - npm run lint
+  - npm run solium
   - npm test
-before_script:
-  - testrpc > /dev/null &
-  - sleep 5
 after_script:
   - npm run coverage && cat coverage/lcov.info | coveralls
