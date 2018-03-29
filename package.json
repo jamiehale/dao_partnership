@@ -5,12 +5,12 @@
   "description": "partnership DAO",
   "devDependencies": {
     "coveralls": "^3.0.0",
-    "eslint": "^4.17.0",
+    "eslint": "^4.19.1",
     "eslint-config-airbnb-base": "^12.1.0",
-    "eslint-plugin-import": "^2.8.0",
-    "solidity-coverage": "^0.4.9",
-    "solium": "^1.1.3",
-    "truffle": "^4.0.6"
+    "eslint-plugin-import": "^2.9.0",
+    "solidity-coverage": "^0.4.15",
+    "solium": "^1.1.6",
+    "truffle": "^4.1.3"
   },
   "license": "MIT",
   "scripts": {
@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "babel-register": "^6.26.0",
-    "solc": "^0.4.19",
-    "web3": "^1.0.0-beta.30"
+    "solc": "^0.4.21",
+    "web3": "^1.0.0-beta.33"
   }
 }
