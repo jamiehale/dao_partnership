@@ -111,11 +111,6 @@ contract Partnership {
     _;
   }
 
-  modifier onlyUnsentTransaction(bytes32 _id) {
-    require (!transactions[_id].sent);
-    _;
-  }
-
   modifier mustBePartner(address _recipient) {
     require (isPartner(_recipient));
     _;
@@ -238,7 +233,7 @@ contract Partnership {
   }
 
   /// Executes a passed transaction
-  function executeTransaction(bytes32 _id) onlyWhenFunded onlyByPartner onlyPassedTransaction(_id) onlyUnsentTransaction(_id) external {
+  function executeTransaction(bytes32 _id) onlyWhenFunded onlyByPartner onlyPassedTransaction(_id) external {
 
     Transaction storage transaction = transactions[_id];
 

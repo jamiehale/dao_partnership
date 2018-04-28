@@ -170,6 +170,8 @@ contract('Partnership', (accounts) => {
     // partner2 executes transaction
     let execution = await partnership.executeTransaction(txnId1, { from: partner2 });
     assert(execution.logs[0].event === 'TransactionSent');
+    // cannot execute the same transaction again
+    await expectThrow(partnership.executeTransaction(txnId1, { from: partner1 }));
     // partner1 executes transactions, which fail to emit any events
     execution = await partnership.executeTransaction(txnId2, { from: partner1 });
     assert(!execution.logs[0]);
