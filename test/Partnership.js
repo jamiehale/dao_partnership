@@ -57,6 +57,16 @@ contract('Partnership', (accounts) => {
     await web3.eth.sendTransaction({ from: partner3, to: partnership.address, value: amount });
     // since funding is now complete, the customer should be able to send ether
     await web3.eth.sendTransaction({ from: customer1, to: partnership.address, value: amount });
+
+    // Test the conditional transition from "Proposed" to "Passed"
+    const txn1 = await partnership.proposeTransaction(customer2, amount, 0, 'refund', { from: partner1 });
+    assert(txn1.logs[0].event === 'TransactionProposed');
+    const txnId1 = txn1.logs[0].args._id; // eslint-disable-line no-underscore-dangle
+    // state doesn't change here
+    const txn2 = await partnership.confirmTransaction(txnId1, { from: partner2 });
+    // state changes here
+    const txn3 = await partnership.confirmTransaction(txnId1, { from: partner3 });
+    assert(txn3.logs[0].event === 'TransactionPassed');
   });
 
   it('should allow only partners to propose transactions', async () => {
