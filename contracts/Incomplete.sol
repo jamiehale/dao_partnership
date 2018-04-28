@@ -12,7 +12,7 @@ contract Incomplete
 
   // Used to call Partnership.withdrawal in a failure condition
   function run(uint value, bytes data) public {
-    require(this.call.value(value)(data));
+    require(address(this).call.value(value)(data));
   }
 
   // This executes when funds are sent to the contract
