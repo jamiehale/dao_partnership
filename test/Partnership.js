@@ -75,7 +75,7 @@ contract('Partnership', (accounts) => {
     // Test a race between two competing, confirmed transactions
     // which each want a total of 8/7 of the balance, to test the balance restriction.
     // First, a partner sends a loan
-    let callData = partnership.contract.repayLoan.getData(partner3, amount.times(3));
+    const callData = partnership.contract.repayLoan.getData(partner3, amount.times(3));
     const txn2 = await partnership.proposeTransaction(partnership.address, 0, callData, 'repay loan', { from: partner2 });
     const txnId2 = txn2.logs[0].args._id; // eslint-disable-line no-underscore-dangle
     await partnership.confirmTransaction(txnId2, { from: partner1 });
@@ -85,7 +85,7 @@ contract('Partnership', (accounts) => {
     // to withdraw their loan, send the first transaction
     const execution = await partnership.executeTransaction(txnId1, { from: partner2 });
     assert(execution.logs[0].event === 'TransactionSent');
-    // the first transaction should pass because balance is still sufficient 
+    // the first transaction should pass because balance is still sufficient
     // although the withdrawal is approved, there is insufficient balance to withdraw.
     await expectThrow(partnership.withdraw(amount.times(3), { from: partner3 }));
   });
