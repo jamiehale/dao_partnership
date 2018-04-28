@@ -7,10 +7,10 @@
     "coveralls": "^3.0.0",
     "eslint": "^4.19.1",
     "eslint-config-airbnb-base": "^12.1.0",
-    "eslint-plugin-import": "^2.10.0",
+    "eslint-plugin-import": "^2.11.0",
     "solidity-coverage": "^0.4.15",
     "solium": "^1.1.6",
-    "truffle": "^4.1.5"
+    "truffle": "^4.1.7"
   },
   "license": "MIT",
   "scripts": {
@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "babel-register": "^6.26.0",
-    "solc": "^0.4.21",
-    "web3": "^1.0.0-beta.33"
+    "solc": "^0.4.23",
+    "web3": "^1.0.0-beta.34"
   }
 }
