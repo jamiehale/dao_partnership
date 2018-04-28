@@ -47,3 +47,7 @@ It uses the Truffle framework for testing, but does not use its deployment syste
 ## Continuous Integration
 
 https://travis-ci.org/jamiehale/dao_partnership
+
+## Code coverage
+
+https://coveralls.io/github/jamiehale/dao_partnership
