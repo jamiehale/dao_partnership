@@ -1,6 +1,6 @@
 /// Partnership
 /// Requires all pre-defined partners agreement on transactions and operations.
-pragma solidity ^0.4.18;
+pragma solidity ^0.4.21;
 
 
 contract Partnership {
@@ -111,11 +111,6 @@ contract Partnership {
     _;
   }
 
-  modifier onlyUnsentTransaction(bytes32 _id) {
-    require (!transactions[_id].sent);
-    _;
-  }
-
   modifier mustBePartner(address _recipient) {
     require (isPartner(_recipient));
     _;
@@ -132,7 +127,7 @@ contract Partnership {
   }
 
   modifier cannotExceedContractBalance(uint _amount) {
-    require (_amount <= this.balance);
+    require (_amount <= (address(this).balance));
     _;
   }
 
@@ -176,10 +171,10 @@ contract Partnership {
         paidPartnerCount = paidPartnerCount + 1;
         if (paidPartnerCount == partnerCount) {
           funded = true;
-          Funded();
+          emit Funded();
         }
       }
-      Deposit(msg.sender, msg.value);
+      emit Deposit(msg.sender, msg.value);
     }
   }
   
@@ -190,7 +185,7 @@ contract Partnership {
     bytes32 id = keccak256(msg.data, block.number);
     
     // grab the presumably blank transaction
-    var transaction = transactions[id];
+    Transaction storage transaction = transactions[id];
 
     transaction.valid = true;
     transaction.to = _to;
@@ -205,7 +200,7 @@ contract Partnership {
 
     activeTransactionCount += 1;
     
-    TransactionProposed(id, msg.sender, _description);
+    emit TransactionProposed(id, msg.sender, _description);
     
     return id;
   }
@@ -218,14 +213,14 @@ contract Partnership {
 
     activeTransactionCount -= 1;
 
-    TransactionCanceled(_id, msg.sender);
+    emit TransactionCanceled(_id, msg.sender);
   }
 
   
   /// Confirms an existing proposed transaction
   function confirmTransaction(bytes32 _id) onlyWhenFunded onlyByPartner onlyValidTransaction(_id) onlyUnconfirmedBySender(_id) external {
 
-    var transaction = transactions[_id];
+    Transaction storage transaction = transactions[_id];
   
     // register the vote  
     transaction.voteCount += 1;
@@ -233,14 +228,14 @@ contract Partnership {
     
     if (transaction.voteCount == partnerCount) {
       transaction.passed = true;
-      TransactionPassed(_id, msg.sender, transaction.description);
+      emit TransactionPassed(_id, msg.sender, transaction.description);
     }
   }
 
   /// Executes a passed transaction
-  function executeTransaction(bytes32 _id) onlyWhenFunded onlyByPartner onlyPassedTransaction(_id) onlyUnsentTransaction(_id) external {
+  function executeTransaction(bytes32 _id) onlyWhenFunded onlyByPartner onlyPassedTransaction(_id) external {
 
-    var transaction = transactions[_id];
+    Transaction storage transaction = transactions[_id];
 
     // register the sent transaction
     transaction.sent = true;
@@ -251,7 +246,7 @@ contract Partnership {
     /* solium-disable-next-line security/no-call-value */
     if (transaction.to.call.value(transaction.value)(transaction.data)) {
 
-      TransactionSent(_id, msg.sender, transaction.description);
+      emit TransactionSent(_id, msg.sender, transaction.description);
 
       // clear the transaction structure to free memory
       delete transactions[_id];
@@ -293,7 +288,7 @@ contract Partnership {
     withdrawableAmounts[msg.sender] -= _amount;
 
     // Log the withdrawal
-    Withdrawal(msg.sender, _amount);
+    emit Withdrawal(msg.sender, _amount);
 
     // send the wei; if this fails the transaction fails.
     msg.sender.transfer(_amount);

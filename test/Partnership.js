@@ -47,7 +47,7 @@ contract('Partnership', (accounts) => {
 
     // A partner should not be able to make an *excess* contribution
     try {
-      await web3.eth.sendTransaction({ from: partner3, to: partnership.address, value: amount * 2 });
+      await web3.eth.sendTransaction({ from: partner3, to: partnership.address, value: amount.times(2) });
     } catch (error) {
       const revert = error.message.search('revert') >= 0;
       assert(revert);
@@ -55,8 +55,39 @@ contract('Partnership', (accounts) => {
 
     // partner 3 contributes to the fund, making it funded.
     await web3.eth.sendTransaction({ from: partner3, to: partnership.address, value: amount });
+
     // since funding is now complete, the customer should be able to send ether
     await web3.eth.sendTransaction({ from: customer1, to: partnership.address, value: amount });
+
+    // partner 3 sends a loan
+    await web3.eth.sendTransaction({ from: partner3, to: partnership.address, value: amount.times(3) });
+
+    // Test the conditional transition from "Proposed" to "Passed"
+    const txn1 = await partnership.proposeTransaction(customer2, amount.times(5), 0, 'refund', { from: partner1 });
+    assert(txn1.logs[0].event === 'TransactionProposed');
+    const txnId1 = txn1.logs[0].args._id; // eslint-disable-line no-underscore-dangle
+    // state doesn't change here
+    await partnership.confirmTransaction(txnId1, { from: partner2 });
+    // state changes here
+    const conf1 = await partnership.confirmTransaction(txnId1, { from: partner3 });
+    assert(conf1.logs[0].event === 'TransactionPassed');
+
+    // Test a race between two competing, confirmed transactions
+    // which each want a total of 8/7 of the balance, to test the balance restriction.
+    // First, a partner sends a loan
+    const callData = partnership.contract.repayLoan.getData(partner3, amount.times(3));
+    const txn2 = await partnership.proposeTransaction(partnership.address, 0, callData, 'repay loan', { from: partner2 });
+    const txnId2 = txn2.logs[0].args._id; // eslint-disable-line no-underscore-dangle
+    await partnership.confirmTransaction(txnId2, { from: partner1 });
+    await partnership.confirmTransaction(txnId2, { from: partner3 });
+    await partnership.executeTransaction(txnId2, { from: partner2 });
+    // now that the second transaction is confirmed, and the partner is allowed
+    // to withdraw their loan, send the first transaction
+    const execution = await partnership.executeTransaction(txnId1, { from: partner2 });
+    assert(execution.logs[0].event === 'TransactionSent');
+    // the first transaction should pass because balance is still sufficient
+    // although the withdrawal is approved, there is insufficient balance to withdraw.
+    await expectThrow(partnership.withdraw(amount.times(3), { from: partner3 }));
   });
 
   it('should allow only partners to propose transactions', async () => {
@@ -144,7 +175,7 @@ contract('Partnership', (accounts) => {
     const txn2 = await partnership.proposeTransaction(partnership.address, 0, callData, 'repay loan - to attacker', { from: partner1 });
     assert(txn2.logs[0].event === 'TransactionProposed');
     // attempts to repay DOUBLE the loan
-    callData = partnership.contract.repayLoan.getData(partner2, loan * 2);
+    callData = partnership.contract.repayLoan.getData(partner2, loan.times(2));
     const txn3 = await partnership.proposeTransaction(partnership.address, 0, callData, 'repay double the loan', { from: partner1 });
     assert(txn3.logs[0].event === 'TransactionProposed');
     const txnId1 = txn1.logs[0].args._id; // eslint-disable-line no-underscore-dangle
@@ -170,6 +201,8 @@ contract('Partnership', (accounts) => {
     // partner2 executes transaction
     let execution = await partnership.executeTransaction(txnId1, { from: partner2 });
     assert(execution.logs[0].event === 'TransactionSent');
+    // cannot execute the same transaction again
+    await expectThrow(partnership.executeTransaction(txnId1, { from: partner1 }));
     // partner1 executes transactions, which fail to emit any events
     execution = await partnership.executeTransaction(txnId2, { from: partner1 });
     assert(!execution.logs[0]);
@@ -246,7 +279,7 @@ contract('Partnership', (accounts) => {
     await web3.eth.sendTransaction({ from: partner1, to: partnership.address, value: amount });
     await web3.eth.sendTransaction({ from: partner2, to: partnership.address, value: amount });
     // create proposal to distribute evenly
-    const callData = partnership.contract.distributeEvenly.getData(amount * 2);
+    const callData = partnership.contract.distributeEvenly.getData(amount.times(2));
     const txn1 = await partnership.proposeTransaction(partnership.address, 0, callData, 'distribute evenly', { from: partner1 });
     assert(txn1.logs[0].event === 'TransactionProposed');
     const txnId1 = txn1.logs[0].args._id; // eslint-disable-line no-underscore-dangle
@@ -259,7 +292,7 @@ contract('Partnership', (accounts) => {
     // randos can't make withdrawals
     await expectThrow(partnership.withdraw(amount, { from: attacker1 }));
     // partners can't make excessive withdrawals
-    await expectThrow(partnership.withdraw(amount * 2, { from: partner1 }));
+    await expectThrow(partnership.withdraw(amount.times(2), { from: partner1 }));
     // partners make withdrawals
     let withdrawal = await partnership.withdraw(amount, { from: partner1 });
     assert(withdrawal.logs[0].event === 'Withdrawal');
@@ -308,7 +341,7 @@ contract('Partnership', (accounts) => {
     execution = await partnership.executeTransaction(txnId1, { from: partner1 });
     assert(execution.logs[0].event === 'TransactionSent');
     // recipient should have the eth ☺
-    assert.equal(web3.eth.getBalance(customer1) - customerBalance, amount * 2);
+    assert.equal(web3.eth.getBalance(customer1) - customerBalance, amount.times(2));
     // but not the tokens ☹
   });
 
