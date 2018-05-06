@@ -143,7 +143,7 @@ contract Partnership {
   /// Constructor to set up the partnership: an array of addresses for the `_partners`
   /// and the `_sharePrice` that each partner must send to the contract for the
   /// partnership to launch.
-  function Partnership(address[] _partners, uint _sharePrice) public {
+  constructor(address[] _partners, uint _sharePrice) public {
     funded = false;
     partners = _partners;
     sharePrice = _sharePrice;
@@ -179,7 +179,12 @@ contract Partnership {
   }
   
   /// Adds a proposed transaction to be confirmed by other partners
-  function proposeTransaction(address _to, uint _value, bytes _data, string _description) onlyWhenFunded onlyByPartner external returns (bytes32) {
+  function proposeTransaction(address _to, uint _value, bytes _data, string _description) 
+    onlyWhenFunded
+    onlyByPartner
+    external
+    returns (bytes32)
+  {
 
     // generate hash for easy specification in confirm and execute
     bytes32 id = keccak256(msg.data, block.number);
@@ -207,7 +212,14 @@ contract Partnership {
 
   /// Cancels a transaction that has not yet passed
   /* solium-disable-next-line blank-lines */
-  function cancelTransaction(bytes32 _id) onlyWhenFunded onlyByPartner onlyValidTransaction(_id) onlyUnpassedTransaction(_id) onlyTransactionCreator(_id) external {
+  function cancelTransaction(bytes32 _id)
+    onlyWhenFunded
+    onlyByPartner
+    onlyValidTransaction(_id)
+    onlyUnpassedTransaction(_id)
+    onlyTransactionCreator(_id)
+    external
+  {
 
     delete transactions[_id];
 

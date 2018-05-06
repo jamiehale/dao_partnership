@@ -4,13 +4,13 @@
   "private": true,
   "description": "partnership DAO",
   "devDependencies": {
-    "coveralls": "^3.0.0",
+    "coveralls": "^3.0.1",
     "eslint": "^4.19.1",
     "eslint-config-airbnb-base": "^12.1.0",
     "eslint-plugin-import": "^2.11.0",
     "solidity-coverage": "^0.4.15",
-    "solium": "^1.1.6",
-    "truffle": "^4.1.7"
+    "solium": "^1.1.7",
+    "truffle": "^4.1.8"
   },
   "license": "MIT",
   "scripts": {

@@ -6,7 +6,7 @@ contract Incomplete
   // The fund can only receive money once
   bool public once;
 
-  function Incomplete() public {
+  constructor() public {
     once = true;
   }
 
