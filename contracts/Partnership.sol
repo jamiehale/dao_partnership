@@ -187,7 +187,7 @@ contract Partnership {
   {
 
     // generate hash for easy specification in confirm and execute
-    bytes32 id = keccak256(msg.data, block.number);
+    bytes32 id = keccak256(abi.encodePacked(msg.data, block.number));
     
     // grab the presumably blank transaction
     Transaction storage transaction = transactions[id];
