@@ -180,9 +180,9 @@ contract Partnership {
   
   /// Adds a proposed transaction to be confirmed by other partners
   function proposeTransaction(address _to, uint _value, bytes _data, string _description) 
+    external
     onlyWhenFunded
     onlyByPartner
-    external
     returns (bytes32)
   {
 
@@ -213,12 +213,12 @@ contract Partnership {
   /// Cancels a transaction that has not yet passed
   /* solium-disable-next-line blank-lines */
   function cancelTransaction(bytes32 _id)
+    external
     onlyWhenFunded
     onlyByPartner
     onlyValidTransaction(_id)
     onlyUnpassedTransaction(_id)
     onlyTransactionCreator(_id)
-    external
   {
 
     delete transactions[_id];
@@ -230,7 +230,7 @@ contract Partnership {
 
   
   /// Confirms an existing proposed transaction
-  function confirmTransaction(bytes32 _id) onlyWhenFunded onlyByPartner onlyValidTransaction(_id) onlyUnconfirmedBySender(_id) external {
+  function confirmTransaction(bytes32 _id) external onlyWhenFunded onlyByPartner onlyValidTransaction(_id) onlyUnconfirmedBySender(_id) {
 
     Transaction storage transaction = transactions[_id];
   
@@ -245,7 +245,7 @@ contract Partnership {
   }
 
   /// Executes a passed transaction
-  function executeTransaction(bytes32 _id) onlyWhenFunded onlyByPartner onlyPassedTransaction(_id) external {
+  function executeTransaction(bytes32 _id) external onlyWhenFunded onlyByPartner onlyPassedTransaction(_id) {
 
     Transaction storage transaction = transactions[_id];
 
@@ -271,13 +271,13 @@ contract Partnership {
   }
 
   /// Distribute ETH to a partner or external recipient
-  function distribute(address _recipient, uint _amount) onlyByDao external {
+  function distribute(address _recipient, uint _amount) external onlyByDao {
 
     withdrawableAmounts[_recipient] += _amount;
   }
 
   /// Distribute ETH evenly amongst all partners
-  function distributeEvenly(uint _amount) onlyByDao external {
+  function distributeEvenly(uint _amount) external onlyByDao {
 
     uint payout = _amount / partnerCount;
 
@@ -287,14 +287,14 @@ contract Partnership {
   }
 
   /// Mark down partner's loan and make it available for withdrawal
-  function repayLoan(address _recipient, uint _amount) onlyByDao mustBePartner(_recipient) noMoreThanLoan(_recipient, _amount) external {
+  function repayLoan(address _recipient, uint _amount) external onlyByDao mustBePartner(_recipient) noMoreThanLoan(_recipient, _amount) {
 
     partnerRecords[_recipient].loanBalance -= _amount;
     withdrawableAmounts[_recipient] += _amount;
   }
 
   /// Allow partner or external recipient to withdraw funds marked as withdrawable
-  function withdraw(uint _amount) onlyWhenFunded cannotExceedWithdrawableAmount(_amount) cannotExceedContractBalance(_amount) external {
+  function withdraw(uint _amount) external onlyWhenFunded cannotExceedWithdrawableAmount(_amount) cannotExceedContractBalance(_amount) {
 
     // mark the withdrawal as successful
     withdrawableAmounts[msg.sender] -= _amount;
@@ -307,12 +307,12 @@ contract Partnership {
   }
   
   /// Dissolve DAO and send the remaining ETH to a beneficiary
-  function dissolve(address _beneficiary) onlyByDao onlyValidBeneficiary(_beneficiary) external {
+  function dissolve(address _beneficiary) external onlyByDao onlyValidBeneficiary(_beneficiary) {
 
     selfdestruct(_beneficiary);
   }
   
-  function isPartner(address _address) view internal returns (bool) {
+  function isPartner(address _address) internal view returns (bool) {
     return partnerRecords[_address].isPartner;
   }
 
