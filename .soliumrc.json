@@ -4,6 +4,7 @@
     "security"
   ],
   "rules": {
+    "error-reason": "off",
     "quotes": [
       "error",
       "double"
